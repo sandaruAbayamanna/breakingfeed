@@ -1,0 +1,18 @@
+[build]
+  functions = "netlify/functions"
+  publish = "."
+
+[[redirects]]
+  from = "/api/news/everything"
+  to = "/.netlify/functions/news-everything"
+  status = 200
+
+[[redirects]]
+  from = "/api/news/top-headlines"
+  to = "/.netlify/functions/news-top-headlines"
+  status = 200
+
+[[redirects]]
+  from = "/api/fb/post"
+  to = "/.netlify/functions/fb-post"
+  status = 200

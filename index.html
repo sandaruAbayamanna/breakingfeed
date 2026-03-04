@@ -701,8 +701,8 @@ async function fetchNews(){
   try{
     // Fetch both breaking/war AND top headlines in parallel
     const [warRes, topRes] = await Promise.all([
-      fetch(`https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=${lang}&sortBy=${sort}&pageSize=20&apiKey=${key}`),
-      fetch(`https://newsapi.org/v2/top-headlines?category=general&language=${lang}&pageSize=10&apiKey=${key}`)
+      fetch(`/api/news/everything?q=${encodeURIComponent(q)}&language=${lang}&sortBy=${sort}&pageSize=20&apiKey=${key}`),
+      fetch(`/api/news/top-headlines?category=general&language=${lang}&pageSize=10&apiKey=${key}`)
     ]);
     const warData=await warRes.json();
     const topData=await topRes.json();
@@ -934,8 +934,8 @@ async function postToFB(articleIdx, caption){
   log(`Posting: "${a.title.slice(0,40)}…"`,'inf');
 
   try{
-    const body={message:cap,link:a.url,access_token:fbToken};
-    const res=await fetch(`https://graph.facebook.com/v19.0/${fbPageId}/feed`,{
+    const body={pageId:fbPageId,message:cap,link:a.url,access_token:fbToken};
+    const res=await fetch(`/api/fb/post`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(body)
     });
