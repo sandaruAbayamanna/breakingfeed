@@ -16,3 +16,13 @@
   from = "/api/fb/post"
   to = "/.netlify/functions/fb-post"
   status = 200
+
+[[redirects]]
+  from = "/api/fb/video"
+  to = "/.netlify/functions/fb-video"
+  status = 200
+
+[[redirects]]
+  from = "/api/extract-video"
+  to = "/.netlify/functions/extract-video"
+  status = 200

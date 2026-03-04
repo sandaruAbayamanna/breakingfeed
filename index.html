@@ -405,6 +405,57 @@ select.inp{cursor:pointer;}
 ::-webkit-scrollbar{width:3px;height:3px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+.media-tabs{display:flex;gap:4px;margin-bottom:8px;}
+.mtab{padding:4px 10px;font-size:10px;font-family:'JetBrains Mono',monospace;background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:4px;cursor:pointer;transition:all 0.15s;}
+.mtab.on{background:var(--red-dim);border-color:var(--red);color:var(--red);}
+.upload-zone{border:2px dashed var(--border2);border-radius:8px;padding:18px;text-align:center;cursor:pointer;transition:all 0.2s;background:var(--card);position:relative;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--red);background:var(--red-dim);}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-zone-icon{font-size:24px;margin-bottom:4px;}
+.upload-zone-txt{font-size:11px;color:var(--muted2);}
+.upload-zone-sub{font-size:10px;color:var(--muted);margin-top:2px;font-family:'JetBrains Mono',monospace;}
+.video-info{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:10px;display:flex;align-items:center;gap:10px;margin-top:6px;}
+.video-info-icon{font-size:22px;}
+.video-info-txt{flex:1;min-width:0;}
+.video-info-name{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.video-info-size{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);}
+.video-clear{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;}
+.video-clear:hover{color:var(--red);}
+.progress-wrap{margin-top:8px;background:var(--card);border:1px solid var(--border);border-radius:4px;overflow:hidden;height:8px;display:none;}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--red),var(--amber));width:0%;transition:width 0.4s;}
+.progress-label{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);margin-top:4px;text-align:center;display:none;}
+.post-type-row{display:flex;gap:4px;margin-bottom:8px;}
+.ptyp{padding:5px 12px;font-size:10px;font-family:'JetBrains Mono',monospace;background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:4px;cursor:pointer;transition:all 0.15s;flex:1;text-align:center;}
+.ptyp.on{background:var(--blue-fb);color:#fff;border-color:var(--blue-fb);}
+
+
+.vresult{
+  background:var(--card2);border:1px solid var(--border);border-radius:8px;
+  padding:10px 12px;cursor:pointer;transition:all 0.2s;
+  display:flex;align-items:center;gap:10px;
+}
+.vresult:hover{border-color:var(--amber);}
+.vresult.selected{border-color:var(--green);background:var(--green-dim);}
+.vresult-icon{font-size:20px;flex-shrink:0;}
+.vresult-info{flex:1;min-width:0;}
+.vresult-label{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vresult-meta{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.vresult-badge{font-size:9px;padding:2px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+.vresult-badge.direct{background:var(--green-dim);color:var(--green);border:1px solid rgba(45,214,113,0.2);}
+.vresult-badge.youtube{background:rgba(255,0,0,0.1);color:#FF4444;border:1px solid rgba(255,0,0,0.2);}
+.vresult-badge.vimeo{background:rgba(26,183,234,0.1);color:#1AB7EA;border:1px solid rgba(26,183,234,0.2);}
+.vresult-badge.hls{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,173,51,0.2);}
+.extract-empty{text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.video-selected-box{
+  background:var(--card);border:1px solid var(--green);border-radius:8px;padding:10px;
+}
+.video-selected-box .vsb-title{font-size:11px;font-weight:700;margin-bottom:4px;color:var(--green);}
+.video-selected-box .vsb-url{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:8px;}
+.video-selected-box video{width:100%;border-radius:6px;max-height:100px;}
+
 </style>
 </head>
 <body>
@@ -553,11 +604,66 @@ select.inp{cursor:pointer;}
       </div>
 
       <div>
-        <div class="field-label">MEDIA LINK (image or video URL)</div>
-        <div class="media-row">
-          <input class="inp" type="text" id="mediaUrl" placeholder="https://…" oninput="previewMedia()" />
+        <div class="field-label">ATTACH MEDIA</div>
+
+        <!-- Post type selector -->
+        <div class="post-type-row">
+          <button class="ptyp on" id="ptText" onclick="setPostType('text',this)">📝 Text+Link</button>
+          <button class="ptyp" id="ptImage" onclick="setPostType('image',this)">🖼 Image URL</button>
+          <button class="ptyp" id="ptVideo" onclick="setPostType('video',this)">🎬 Video</button>
         </div>
-        <div class="media-preview" id="mediaPrev" style="display:none;"></div>
+
+        <!-- Text+Link panel -->
+        <div id="panelText">
+          <div class="field-label" style="margin-bottom:4px;">ARTICLE LINK (auto-attached)</div>
+          <input class="inp" type="text" id="mediaUrl" placeholder="Article URL…" oninput="previewMedia()" />
+        </div>
+
+        <!-- Image URL panel -->
+        <div id="panelImage" style="display:none;">
+          <input class="inp" type="text" id="imageUrl" placeholder="https://example.com/image.jpg" oninput="previewImageUrl()" />
+          <div class="media-preview" id="mediaPrev" style="display:none;margin-top:6px;"></div>
+        </div>
+
+        <!-- Video panel -->
+        <div id="panelVideo" style="display:none;">
+          <!-- Tabs -->
+          <div class="media-tabs">
+            <button class="mtab on" id="vtExtract" onclick="setVideoTab('extract',this)">🔍 Extract from Article</button>
+            <button class="mtab" id="vtUrl" onclick="setVideoTab('url',this)">🔗 Paste Video URL</button>
+          </div>
+
+          <!-- EXTRACT TAB -->
+          <div id="videoExtractPanel">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="inp" style="margin:0;flex:1;" type="text" id="extractUrl" placeholder="Paste article URL to extract video…" />
+              <button class="btn btn-red" id="extractBtn" onclick="extractVideo()" style="width:auto;padding:8px 12px;font-size:11px;white-space:nowrap;">🔍 Extract</button>
+            </div>
+            <div id="extractStatus" style="margin-top:6px;display:none;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);"></div>
+            <!-- Results list -->
+            <div id="videoResults" style="display:none;margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
+            <!-- Selected video preview -->
+            <div id="selectedVideoPrev" style="display:none;margin-top:8px;"></div>
+          </div>
+
+          <!-- URL TAB -->
+          <div id="videoUrlPanel" style="display:none;">
+            <input class="inp" type="text" id="videoUrl" placeholder="https://…/video.mp4" oninput="previewVideoUrl()" />
+            <div id="videoUrlPrev" style="margin-top:6px;display:none;"></div>
+          </div>
+
+          <!-- Progress bar (shared) -->
+          <div class="progress-wrap" id="progressWrap" style="margin-top:8px;">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="progress-label" id="progressLabel">Uploading…</div>
+
+          <div style="margin-top:8px;">
+            <div class="field-label">VIDEO TITLE (optional)</div>
+            <input class="inp" type="text" id="videoTitle" placeholder="e.g. Breaking: Airstrike footage" />
+          </div>
+        </div>
+
       </div>
 
       <div>
@@ -581,7 +687,7 @@ select.inp{cursor:pointer;}
       </div>
 
       <div class="post-btns">
-        <button class="btn btn-blue" onclick="postNow()">📘 POST TO FACEBOOK NOW</button>
+        <button class="btn btn-blue" id="postNowBtn" onclick="postNow()">📘 POST TO FACEBOOK NOW</button>
         <button class="btn btn-ghost" onclick="copyAndOpen()">📋 COPY + OPEN FACEBOOK</button>
         <div class="sched-row">
           <input class="inp" type="datetime-local" id="schedTime" />
@@ -839,6 +945,29 @@ function selectArt(i){
 
   syncPreview();
 
+  // Reset post type to text+link on new selection
+  setPostType('text', document.getElementById('ptText'));
+  document.getElementById('mediaUrl').value = a.url||'';
+  document.getElementById('imageUrl').value = a.urlToImage||'';
+  document.getElementById('videoUrl').value = '';
+  document.getElementById('videoTitle').value = '';
+  clearVideoFile();
+  hideProgress();
+  // Reset extraction state
+  extractedVideos=[];
+  selectedExtractedVideo=null;
+  const vr=document.getElementById('videoResults');
+  const vs=document.getElementById('selectedVideoPrev');
+  const es=document.getElementById('extractStatus');
+  if(vr){vr.innerHTML='';vr.style.display='none';}
+  if(vs)vs.style.display='none';
+  if(es)es.style.display='none';
+  previewImageUrl();
+  updatePostBtnLabel();
+
+  // Auto-fill extract URL with article URL
+  autoFillExtractUrl(a.url);
+
   // Auto AI if toggle on
   if(document.getElementById('tgAiAuto').classList.contains('on')){
     aiCaption();
@@ -854,24 +983,240 @@ function buildCaption(a){
 // ══════════════════════════════════════════
 // MEDIA PREVIEW
 // ══════════════════════════════════════════
-function previewMedia(){
-  const url=document.getElementById('mediaUrl').value.trim();
-  const prev=document.getElementById('mediaPrev');
-  const fbPrev=document.getElementById('fbMediaPrev');
+// ══════════════════════════════════════════
+// POST TYPE & VIDEO TABS
+// ══════════════════════════════════════════
+let currentPostType = 'text'; // text | image | video
+let currentVideoTab = 'url';  // url | file
+let selectedVideoFile = null;
+let selectedVideoObjectUrl = null;
+
+function setPostType(type, btn) {
+  currentPostType = type;
+  document.querySelectorAll('.ptyp').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('panelText').style.display  = type==='text'  ? 'block' : 'none';
+  document.getElementById('panelImage').style.display = type==='image' ? 'block' : 'none';
+  document.getElementById('panelVideo').style.display = type==='video' ? 'block' : 'none';
+  // Update FB preview
+  const fbPrev = document.getElementById('fbMediaPrev');
+  if(type==='text') fbPrev.innerHTML='';
+  updatePostBtnLabel();
+}
+
+function setVideoTab(tab, btn) {
+  currentVideoTab = tab;
+  document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('videoExtractPanel').style.display = tab==='extract' ? 'block' : 'none';
+  document.getElementById('videoUrlPanel').style.display     = tab==='url'     ? 'block' : 'none';
+}
+
+// ══════════════════════════════════════════
+// VIDEO EXTRACTION FROM ARTICLE
+// ══════════════════════════════════════════
+let extractedVideos = [];
+let selectedExtractedVideo = null;
+
+async function extractVideo() {
+  const urlInput = document.getElementById('extractUrl');
+  const url = urlInput.value.trim();
+  if (!url) { toast('Paste an article URL first', 'err'); return; }
+
+  const btn = document.getElementById('extractBtn');
+  const status = document.getElementById('extractStatus');
+  const results = document.getElementById('videoResults');
+  const prevBox = document.getElementById('selectedVideoPrev');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Scanning…';
+  status.style.display = 'block';
+  status.textContent = 'Fetching article and scanning for videos…';
+  results.style.display = 'none';
+  prevBox.style.display = 'none';
+  selectedExtractedVideo = null;
+
+  log(`Extracting video from: ${url.slice(0,50)}…`, 'inf');
+
+  try {
+    const res = await fetch('/api/extract-video', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+
+    if (data.error && !data.videos?.length) throw new Error(data.error);
+
+    extractedVideos = data.videos || [];
+    btn.disabled = false;
+    btn.textContent = '🔍 Extract';
+
+    if (!extractedVideos.length) {
+      status.textContent = '⚠ No videos found in this article. Try a different URL.';
+      log('No videos found in article', 'warn');
+      toast('No videos found', 'inf');
+      return;
+    }
+
+    status.textContent = `✓ Found ${extractedVideos.length} video${extractedVideos.length>1?'s':''} — select one to post`;
+    log(`Extracted ${extractedVideos.length} video(s)`, 'ok');
+    toast(`Found ${extractedVideos.length} video(s)!`, 'ok');
+
+    // Render results
+    results.style.display = 'flex';
+    results.innerHTML = extractedVideos.map((v, i) => {
+      const icons = { youtube:'▶', vimeo:'🎬', hls:'📡', direct:'🎬' };
+      return `<div class="vresult" id="vr-${i}" onclick="selectExtractedVideo(${i})">
+        <div class="vresult-icon">${icons[v.type]||'🎬'}</div>
+        <div class="vresult-info">
+          <div class="vresult-label">${v.label||'Video '+i}</div>
+          <div class="vresult-meta">${v.url.slice(0,55)}…</div>
+        </div>
+        <span class="vresult-badge ${v.type}">${v.type.toUpperCase()}</span>
+      </div>`;
+    }).join('');
+
+    // Auto-select first
+    selectExtractedVideo(0);
+
+  } catch(err) {
+    status.textContent = '✗ ' + err.message;
+    btn.disabled = false;
+    btn.textContent = '🔍 Extract';
+    log('Extract failed: ' + err.message, 'err');
+    toast('Extract failed: ' + err.message, 'err');
+  }
+}
+
+function selectExtractedVideo(i) {
+  selectedExtractedVideo = extractedVideos[i];
+  // Highlight selected
+  document.querySelectorAll('.vresult').forEach(el => el.classList.remove('selected'));
+  const el = document.getElementById('vr-'+i);
+  if(el) el.classList.add('selected');
+
+  const v = selectedExtractedVideo;
+  const prevBox = document.getElementById('selectedVideoPrev');
+  prevBox.style.display = 'block';
+
+  let previewHtml = '';
+  if(v.type === 'direct') {
+    previewHtml = `<video controls src="${v.url}" style="width:100%;max-height:100px;border-radius:6px;margin-bottom:6px;"></video>`;
+  } else if(v.type === 'youtube') {
+    const ytId = v.url.match(/[?&]v=([^&]+)/)?.[1] || v.url.split('/').pop();
+    previewHtml = `<div style="background:#000;border-radius:6px;height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;cursor:pointer;" onclick="window.open('${v.url}','_blank')">
+      <span style="font-size:28px;">▶</span>
+      <span style="font-size:11px;color:#aaa;margin-left:8px;">YouTube · Click to preview</span>
+    </div>`;
+  } else {
+    previewHtml = `<div style="background:var(--card2);border-radius:6px;padding:8px;margin-bottom:6px;font-size:10px;color:var(--muted2);font-family:'JetBrains Mono',monospace;">
+      ${v.type==='hls'?'📡 HLS Stream':'🎬 Video'} · ${v.url.slice(0,50)}
+    </div>`;
+  }
+
+  prevBox.innerHTML = `<div class="video-selected-box">
+    <div class="vsb-title">✓ Selected: ${v.label}</div>
+    <div class="vsb-url">${v.url}</div>
+    ${previewHtml}
+    <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;">
+      Source: ${v.source} · This video will be posted directly to your Facebook Page
+    </div>
+  </div>`;
+
+  // Also update FB preview
+  document.getElementById('fbMediaPrev').innerHTML = `<div class="fb-media-vid">▶ 🎬 ${v.label}</div>`;
+  log(`Selected video: ${v.label} (${v.type})`, 'inf');
+}
+
+// Auto-fill extract URL when article is selected
+function autoFillExtractUrl(articleUrl) {
+  const inp = document.getElementById('extractUrl');
+  if(inp && articleUrl) inp.value = articleUrl;
+}
+
+function updatePostBtnLabel() {
+  const btn = document.getElementById('postNowBtn');
+  if(!btn) return;
+  if(currentPostType==='video') btn.textContent = '🎬 POST VIDEO TO FACEBOOK';
+  else if(currentPostType==='image') btn.textContent = '🖼 POST IMAGE TO FACEBOOK';
+  else btn.textContent = '📘 POST TO FACEBOOK NOW';
+}
+
+// ── Image URL preview ──
+function previewImageUrl() {
+  const url = document.getElementById('imageUrl').value.trim();
+  const prev = document.getElementById('mediaPrev');
+  const fbPrev = document.getElementById('fbMediaPrev');
   if(!url){prev.style.display='none';fbPrev.innerHTML='';return;}
-  const vid=ytId(url);
+  prev.style.display='block';
+  prev.innerHTML=`<img src="${url}" style="width:100%;max-height:80px;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'">`;
+  fbPrev.innerHTML=`<img class="fb-media" src="${url}" onerror="this.remove()">`;
+}
+
+// ── Video URL preview ──
+function previewVideoUrl() {
+  const url = document.getElementById('videoUrl').value.trim();
+  const prev = document.getElementById('videoUrlPrev');
+  const fbPrev = document.getElementById('fbMediaPrev');
+  if(!url){prev.style.display='none';fbPrev.innerHTML='';return;}
+  const vid = ytId(url);
   if(vid){
     prev.style.display='block';
-    prev.innerHTML=`<div class="vid-src">▶ YouTube video detected: ${url.slice(0,40)}…</div>`;
-    fbPrev.innerHTML=`<div class="fb-media-vid">▶ 🎬</div>`;
-  } else if(url.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)||url.includes('urlToImage')||url.includes('img')){
+    prev.innerHTML=`<div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--blue);">▶ YouTube: ${url.slice(0,50)}</div>`;
+    fbPrev.innerHTML=`<div class="fb-media-vid">▶ 🎬 YouTube Video</div>`;
+  } else if(url.match(/\.(mp4|mov|avi|mkv|webm)(\?.*)?$/i)){
     prev.style.display='block';
-    prev.innerHTML=`<img src="${url}" style="width:100%;max-height:80px;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'">`;
-    fbPrev.innerHTML=`<img class="fb-media" src="${url}" onerror="this.remove()">`;
+    prev.innerHTML=`<video controls style="width:100%;max-height:100px;border-radius:6px;" src="${url}"></video>`;
+    fbPrev.innerHTML=`<div class="fb-media-vid">▶ 🎬 Video</div>`;
   } else {
-    prev.style.display='none';
-    fbPrev.innerHTML='';
+    prev.style.display='block';
+    prev.innerHTML=`<div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;padding:6px;">🔗 ${url.slice(0,60)}</div>`;
+    fbPrev.innerHTML=`<div class="fb-media-vid">▶ 🎬</div>`;
   }
+}
+
+// ── File upload handler ──
+function onVideoFileChange(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+  selectedVideoFile = file;
+  if(selectedVideoObjectUrl) URL.revokeObjectURL(selectedVideoObjectUrl);
+  selectedVideoObjectUrl = URL.createObjectURL(file);
+  const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+  document.getElementById('videoFileInfo').style.display='flex';
+  document.getElementById('videoFileName').textContent = file.name;
+  document.getElementById('videoFileSize').textContent = sizeMB + ' MB · ' + file.type;
+  document.getElementById('fbMediaPrev').innerHTML=`<div class="fb-media-vid">▶ 🎬 ${file.name}</div>`;
+  // Drag zone styling
+  const zone = document.getElementById('uploadZone');
+  zone.style.borderColor='var(--green)';
+  zone.style.background='var(--green-dim)';
+}
+
+function clearVideoFile() {
+  selectedVideoFile = null;
+  if(selectedVideoObjectUrl) { URL.revokeObjectURL(selectedVideoObjectUrl); selectedVideoObjectUrl=null; }
+  document.getElementById('videoFile').value='';
+  document.getElementById('videoFileInfo').style.display='none';
+  document.getElementById('fbMediaPrev').innerHTML='';
+  const zone = document.getElementById('uploadZone');
+  zone.style.borderColor='';zone.style.background='';
+}
+
+// Drag over styling
+document.addEventListener('DOMContentLoaded', () => {
+  const zone = document.getElementById('uploadZone');
+  if(!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); });
+});
+
+// Legacy previewMedia kept for article selection fallback
+function previewMedia(){
+  const url=document.getElementById('mediaUrl')?.value?.trim()||'';
+  // handled by post type panels now
 }
 
 function syncPreview(){
@@ -918,7 +1263,6 @@ async function aiCaption(articleIdx){
 
 // ══════════════════════════════════════════
 // POST TO FACEBOOK
-// ══════════════════════════════════════════
 async function postToFB(articleIdx, caption){
   const fbToken=document.getElementById('fbToken').value.trim();
   const fbPageId=document.getElementById('fbPageId').value.trim();
@@ -928,27 +1272,50 @@ async function postToFB(articleIdx, caption){
     return false;
   }
   const a=articles[articleIdx];
-  const cap=caption||document.getElementById('captionBox').value;
-  const mediaUrl=articleIdx===selIdx?document.getElementById('mediaUrl').value.trim():(a.urlToImage||'');
+  const cap=caption||(articleIdx===selIdx?document.getElementById('captionBox').value:buildCaption(a));
+  const postType = articleIdx===selIdx ? currentPostType : 'text';
 
-  log(`Posting: "${a.title.slice(0,40)}…"`,'inf');
+  log(`Posting [${postType}]: "${a.title.slice(0,35)}…"`, 'inf');
 
+  // ── VIDEO POST ──
+  if(postType==='video'){
+    return await postVideoToFB(articleIdx, cap);
+  }
+
+  // ── IMAGE POST ──
+  if(postType==='image'){
+    const imgUrl = document.getElementById('imageUrl').value.trim() || a.urlToImage || '';
+    try{
+      // Post as photo if image URL provided, else fall back to link post
+      let endpoint, body;
+      if(imgUrl){
+        endpoint = `/api/fb/post`;
+        body = {pageId:fbPageId, message:cap, link:a.url, access_token:fbToken};
+        // Note: Facebook link posts auto-scrape OG image. For direct photo use /photos endpoint.
+      } else {
+        endpoint = `/api/fb/post`;
+        body = {pageId:fbPageId, message:cap, link:a.url, access_token:fbToken};
+      }
+      const res = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const data = await res.json();
+      if(data.error) throw new Error(data.error.message);
+      markPosted(a, data.id, articleIdx);
+      return true;
+    }catch(err){
+      log('Image post failed: '+err.message,'err');
+      toast('Post failed: '+err.message,'err');
+      addToQueue(a.title,'ERROR','fail');
+      return false;
+    }
+  }
+
+  // ── TEXT + LINK POST (default) ──
   try{
     const body={pageId:fbPageId,message:cap,link:a.url,access_token:fbToken};
-    const res=await fetch(`/api/fb/post`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(body)
-    });
+    const res=await fetch(`/api/fb/post`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
-
-    postedUrls.add(a.url);
-    totalPosted++;
-    document.getElementById('sPosted').textContent=totalPosted;
-    log(`✓ Posted! FB ID: ${data.id}`,'ok');
-    toast('Posted to Facebook!','ok');
-    renderFeed();
-    addToQueue(a.title,data.id,'done');
+    markPosted(a, data.id, articleIdx);
     return true;
   }catch(err){
     log(`Post failed: ${err.message}`,'err');
@@ -958,29 +1325,172 @@ async function postToFB(articleIdx, caption){
   }
 }
 
-async function postNow(){
-  await postToFB(selIdx);
+// ══════════════════════════════════════════
+// VIDEO UPLOAD TO FACEBOOK
+// ══════════════════════════════════════════
+async function postVideoToFB(articleIdx, cap) {
+  const fbToken=document.getElementById('fbToken').value.trim();
+  const fbPageId=document.getElementById('fbPageId').value.trim();
+  const a=articles[articleIdx];
+  const title=document.getElementById('videoTitle').value.trim()||a.title.slice(0,80);
+
+  // ── Via Extracted Video ──
+  if(currentVideoTab==='extract'){
+    if(!selectedExtractedVideo){toast('Extract a video from an article first','err');return false;}
+    const v = selectedExtractedVideo;
+    // YouTube/Vimeo: Facebook can embed these via file_url
+    // Direct MP4: Facebook fetches directly
+    try{
+      showProgress(15,'Sending extracted video to Facebook…');
+      const body={pageId:fbPageId,access_token:fbToken,description:cap,title,file_url:v.url};
+      const res=await fetch('/api/fb/video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const data=await res.json();
+      if(data.error)throw new Error(data.error.message);
+      showProgress(100,'Video posted!');
+      setTimeout(hideProgress,2000);
+      markPosted(a,data.id,articleIdx);
+      return true;
+    }catch(err){
+      hideProgress();
+      log('Extracted video post failed: '+err.message,'err');
+      toast('Video failed: '+err.message,'err');
+      addToQueue(a.title,'ERROR','fail');
+      return false;
+    }
+  }
+
+  // ── Via URL ──
+  if(currentVideoTab==='url'){
+    const videoUrl=document.getElementById('videoUrl').value.trim();
+    if(!videoUrl){toast('Enter a video URL first','err');return false;}
+    try{
+      showProgress(10,'Sending video URL to Facebook…');
+      const body={pageId:fbPageId,access_token:fbToken,description:cap,title,file_url:videoUrl};
+      const res=await fetch('/api/fb/video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const data=await res.json();
+      if(data.error)throw new Error(data.error.message);
+      showProgress(100,'Upload complete!');
+      setTimeout(hideProgress,2000);
+      markPosted(a,data.id,articleIdx);
+      return true;
+    }catch(err){
+      hideProgress();
+      log('Video post failed: '+err.message,'err');
+      toast('Video failed: '+err.message,'err');
+      addToQueue(a.title,'ERROR','fail');
+      return false;
+    }
+  }
+
+  // ── Via File Upload (Resumable Upload API) ──
+  if(!selectedVideoFile){toast('Select a video file first','err');return false;}
+  try{
+    showProgress(5,'Initializing upload…');
+    log(`Uploading video file: ${selectedVideoFile.name} (${(selectedVideoFile.size/1024/1024).toFixed(1)} MB)`,'inf');
+
+    // Step 1: Initialize resumable upload session
+    const initUrl=`https://graph.facebook.com/v19.0/${fbPageId}/videos`;
+    const initParams=new URLSearchParams({
+      upload_phase:'start',
+      file_size:selectedVideoFile.size,
+      access_token:fbToken
+    });
+
+    // We route through our Netlify function to avoid CORS
+    const initRes=await fetch('/api/fb/video',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        pageId:fbPageId,
+        access_token:fbToken,
+        description:cap,
+        title,
+        file_size:selectedVideoFile.size,
+        upload_phase:'start'
+      })
+    });
+    const initData=await initRes.json();
+    if(initData.error)throw new Error(initData.error.message);
+
+    showProgress(20,'Uploading video chunks…');
+
+    // Step 2: Upload file in chunks via fetch (direct to FB for binary data)
+    const uploadId=initData.upload_session_id||initData.video_id;
+    const startOffset=parseInt(initData.start_offset||0);
+    const endOffset=parseInt(initData.end_offset||selectedVideoFile.size);
+
+    // Upload binary chunk
+    const chunk=selectedVideoFile.slice(startOffset,endOffset);
+    const formData=new FormData();
+    formData.append('access_token',fbToken);
+    formData.append('upload_phase','transfer');
+    formData.append('upload_session_id',uploadId);
+    formData.append('start_offset',startOffset);
+    formData.append('video_file_chunk',chunk,selectedVideoFile.name);
+
+    showProgress(50,'Transferring video…');
+    const uploadRes=await fetch(`https://graph.facebook.com/v19.0/${fbPageId}/videos`,{
+      method:'POST',body:formData
+    });
+    const uploadData=await uploadRes.json();
+    if(uploadData.error)throw new Error(uploadData.error.message);
+
+    // Step 3: Finish upload
+    showProgress(85,'Finalizing…');
+    const finishData=new FormData();
+    finishData.append('access_token',fbToken);
+    finishData.append('upload_phase','finish');
+    finishData.append('upload_session_id',uploadId);
+    finishData.append('description',cap);
+    finishData.append('title',title);
+
+    const finishRes=await fetch(`https://graph.facebook.com/v19.0/${fbPageId}/videos`,{
+      method:'POST',body:finishData
+    });
+    const finishResult=await finishRes.json();
+    if(finishResult.error)throw new Error(finishResult.error.message);
+
+    showProgress(100,'Video posted!');
+    setTimeout(hideProgress,2000);
+    markPosted(a,finishResult.id||uploadId,articleIdx);
+    return true;
+
+  }catch(err){
+    hideProgress();
+    log('Video upload failed: '+err.message,'err');
+    toast('Upload failed: '+err.message,'err');
+    addToQueue(a.title,'ERROR','fail');
+    return false;
+  }
 }
 
-async function quickPost(i){
-  selectArt(i);
-  await postToFB(i);
+function showProgress(pct, msg){
+  const wrap=document.getElementById('progressWrap');
+  const bar=document.getElementById('progressBar');
+  const lbl=document.getElementById('progressLabel');
+  if(!wrap)return;
+  wrap.style.display='block';
+  lbl.style.display='block';
+  bar.style.width=pct+'%';
+  lbl.textContent=msg||'Uploading…';
+}
+function hideProgress(){
+  const wrap=document.getElementById('progressWrap');
+  const lbl=document.getElementById('progressLabel');
+  if(wrap)wrap.style.display='none';
+  if(lbl)lbl.style.display='none';
 }
 
-async function quickAiPost(i){
-  selectArt(i);
-  const cap=await aiCaption(i);
-  await postToFB(i,cap);
+function markPosted(a, fbId, articleIdx){
+  postedUrls.add(a.url);
+  totalPosted++;
+  document.getElementById('sPosted').textContent=totalPosted;
+  log(`✓ Posted! FB ID: ${fbId}`,'ok');
+  toast(currentPostType==='video'?'Video posted to Facebook! 🎬':'Posted to Facebook!','ok');
+  renderFeed();
+  addToQueue(a.title, fbId||'OK', 'done');
 }
 
-function copyAndOpen(){
-  const cap=document.getElementById('captionBox').value;
-  const lnk=document.getElementById('mediaUrl').value||articles[selIdx]?.url||'';
-  navigator.clipboard.writeText(cap+'\n\n'+lnk).then(()=>{
-    toast('Copied! Opening Facebook…','ok');
-    setTimeout(()=>window.open('https://www.facebook.com','_blank'),500);
-  });
-}
 
 // ══════════════════════════════════════════
 // SCHEDULE
