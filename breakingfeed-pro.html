@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BreakingFeed PRO</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #07080C;
+  --surface: #0E0F15;
+  --card: #13141C;
+  --card2: #1A1B25;
+  --border: #252633;
+  --border2: #303148;
+  --red: #FF3131;
+  --red-dim: rgba(255,49,49,0.12);
+  --amber: #FFAD33;
+  --amber-dim: rgba(255,173,51,0.1);
+  --blue: #4F8EF7;
+  --blue-fb: #1877F2;
+  --green: #2DD671;
+  --green-dim: rgba(45,214,113,0.1);
+  --text: #E2E4F0;
+  --muted: #6B6D85;
+  --muted2: #9496B0;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Syne',sans-serif;
+  display:flex;flex-direction:column;
+}
+
+/* ═══ SCANLINE TEXTURE ═══ */
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+  pointer-events:none;z-index:9999;
+}
+
+/* ═══ HEADER ═══ */
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;height:54px;flex-shrink:0;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  position:relative;overflow:hidden;
+}
+.hdr::before{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--red),transparent);
+  animation:scanH 4s linear infinite;
+}
+@keyframes scanH{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+.logo{
+  font-family:'Archivo Black',sans-serif;
+  font-size:22px;letter-spacing:4px;
+  display:flex;align-items:center;gap:10px;
+}
+.logo-icon{
+  width:32px;height:32px;border-radius:6px;
+  background:var(--red);display:flex;align-items:center;justify-content:center;
+  font-size:14px;animation:logoPulse 2s ease-in-out infinite;
+}
+@keyframes logoPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,49,49,0.4)}50%{box-shadow:0 0 0 6px rgba(255,49,49,0)}}
+.logo-text{color:var(--text)}
+.logo-text b{color:var(--red)}
+
+.hdr-center{display:flex;align-items:center;gap:16px;}
+.live-badge{
+  display:flex;align-items:center;gap:6px;
+  background:var(--red-dim);border:1px solid var(--red);
+  padding:4px 10px;border-radius:4px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--red);
+  letter-spacing:2px;
+}
+.live-badge::before{
+  content:'';width:6px;height:6px;border-radius:50%;background:var(--red);
+  animation:blink 1s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+.clock{
+  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted2);
+}
+.hdr-stats{display:flex;gap:20px;}
+.hdr-stat{text-align:center;}
+.hdr-stat .n{font-family:'Archivo Black',sans-serif;font-size:20px;line-height:1;}
+.hdr-stat .l{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-top:1px;}
+.hdr-stat.fetched .n{color:var(--amber);}
+.hdr-stat.posted .n{color:var(--green);}
+.hdr-stat.queued .n{color:var(--blue);}
+
+/* ═══ LAYOUT ═══ */
+.layout{display:grid;grid-template-columns:260px 1fr 340px;flex:1;overflow:hidden;}
+
+/* ═══ SIDEBAR ═══ */
+.sidebar{
+  background:var(--surface);border-right:1px solid var(--border);
+  overflow-y:auto;display:flex;flex-direction:column;
+}
+.sb-section{padding:16px;border-bottom:1px solid var(--border);}
+.sb-label{
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:3px;color:var(--muted);text-transform:uppercase;
+  margin-bottom:10px;display:flex;align-items:center;gap:6px;
+}
+.sb-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.inp{
+  width:100%;background:var(--card);border:1px solid var(--border2);
+  color:var(--text);padding:8px 10px;border-radius:6px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  transition:border-color 0.2s;margin-bottom:8px;
+}
+.inp:focus{outline:none;border-color:var(--red);}
+.inp::placeholder{color:var(--muted);}
+select.inp{cursor:pointer;}
+.inp-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+
+.btn{
+  width:100%;padding:9px 14px;border:none;border-radius:6px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  cursor:pointer;transition:all 0.18s;letter-spacing:1px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn+.btn{margin-top:6px;}
+.btn-red{background:var(--red);color:#fff;}
+.btn-red:hover{background:#e02020;transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,49,49,0.35);}
+.btn-red:active{transform:translateY(0);}
+.btn-blue{background:var(--blue-fb);color:#fff;}
+.btn-blue:hover{background:#1565d8;}
+.btn-ghost{background:transparent;color:var(--muted2);border:1px solid var(--border2);}
+.btn-ghost:hover{border-color:var(--text);color:var(--text);}
+.btn-green{background:var(--green);color:#07080C;}
+.btn-green:hover{background:#22b85c;}
+.btn-amber{background:var(--amber);color:#07080C;}
+.btn-amber:hover{background:#e09920;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;}
+
+.chip-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.chip{
+  padding:3px 9px;border-radius:20px;font-size:10px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;border:1px solid var(--border2);
+  color:var(--muted2);background:transparent;transition:all 0.15s;
+}
+.chip.on{background:var(--red);color:#fff;border-color:var(--red);}
+.chip:hover:not(.on){border-color:var(--amber);color:var(--amber);}
+
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:8px;
+}
+.toggle-row span{font-size:11px;color:var(--muted2);}
+.toggle{
+  width:36px;height:20px;background:var(--border2);border-radius:10px;
+  cursor:pointer;position:relative;transition:background 0.2s;border:none;
+}
+.toggle.on{background:var(--green);}
+.toggle::after{
+  content:'';position:absolute;top:3px;left:3px;
+  width:14px;height:14px;border-radius:50%;background:#fff;
+  transition:transform 0.2s;
+}
+.toggle.on::after{transform:translateX(16px);}
+
+.log-wrap{
+  background:var(--card);border:1px solid var(--border);border-radius:6px;
+  overflow:hidden;
+}
+.log-scroll{max-height:110px;overflow-y:auto;padding:6px;}
+.log-line{
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  padding:2px 0;border-bottom:1px solid var(--border);
+  color:var(--muted);
+}
+.log-line:last-child{border:none;}
+.log-line.ok{color:var(--green);}
+.log-line.err{color:var(--red);}
+.log-line.inf{color:var(--blue);}
+.log-line.warn{color:var(--amber);}
+
+/* ═══ FEED ═══ */
+.feed-wrap{overflow-y:auto;background:var(--bg);}
+.feed-bar{
+  position:sticky;top:0;z-index:10;
+  background:rgba(7,8,12,0.92);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+}
+.feed-bar-title{
+  font-family:'Archivo Black',sans-serif;font-size:14px;
+  letter-spacing:3px;color:var(--text);
+}
+.filter-tabs{display:flex;gap:4px;}
+.ftab{
+  padding:4px 10px;font-size:10px;font-family:'JetBrains Mono',monospace;
+  background:transparent;border:1px solid var(--border2);color:var(--muted);
+  border-radius:4px;cursor:pointer;transition:all 0.15s;
+}
+.ftab.on{background:var(--red-dim);border-color:var(--red);color:var(--red);}
+
+.feed-grid{padding:12px;display:flex;flex-direction:column;gap:10px;}
+
+.ncard{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  overflow:hidden;cursor:pointer;transition:all 0.2s;
+  animation:cardIn 0.3s ease forwards;opacity:0;
+}
+@keyframes cardIn{to{opacity:1;transform:none}from{opacity:0;transform:translateY(8px)}}
+.ncard:hover{border-color:var(--border2);box-shadow:0 6px 24px rgba(0,0,0,0.4);}
+.ncard.sel{border-color:var(--amber);box-shadow:0 0 0 2px rgba(255,173,51,0.15);}
+.ncard.breaking-card{border-left:3px solid var(--red);}
+
+.card-top{display:flex;gap:10px;padding:12px 12px 0;}
+.card-thumb{
+  width:80px;height:60px;border-radius:6px;flex-shrink:0;
+  object-fit:cover;background:var(--card2);
+}
+.card-thumb-ph{
+  width:80px;height:60px;border-radius:6px;flex-shrink:0;
+  background:var(--card2);display:flex;align-items:center;justify-content:center;
+  font-size:20px;color:var(--muted);
+}
+.card-top-right{flex:1;min-width:0;}
+.card-badges{display:flex;gap:5px;margin-bottom:5px;flex-wrap:wrap;}
+.badge{
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  padding:2px 6px;border-radius:3px;letter-spacing:1px;font-weight:700;
+}
+.badge.brk{background:var(--red);color:#fff;}
+.badge.src{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,173,51,0.2);}
+.badge.vid{background:rgba(79,142,247,0.15);color:var(--blue);border:1px solid rgba(79,142,247,0.2);}
+.badge.top{background:rgba(45,214,113,0.12);color:var(--green);border:1px solid rgba(45,214,113,0.2);}
+.badge.posted-badge{background:var(--green-dim);color:var(--green);border:1px solid rgba(45,214,113,0.2);}
+.card-title{font-size:12px;font-weight:700;line-height:1.4;color:var(--text);}
+.card-body{padding:6px 12px 10px;}
+.card-desc{font-size:11px;color:var(--muted2);line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.card-foot{
+  padding:8px 12px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;
+}
+.card-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);}
+.card-btns{display:flex;gap:5px;}
+.cbtn{
+  padding:4px 10px;font-size:10px;font-family:'JetBrains Mono',monospace;
+  border:1px solid var(--border2);color:var(--muted2);background:transparent;
+  border-radius:4px;cursor:pointer;transition:all 0.15s;
+}
+.cbtn:hover{border-color:var(--text);color:var(--text);}
+.cbtn.post-now{background:var(--blue-fb);color:#fff;border-color:var(--blue-fb);}
+.cbtn.post-now:hover{background:#1565d8;}
+.cbtn.ai-gen{background:var(--amber-dim);color:var(--amber);border-color:rgba(255,173,51,0.3);}
+.cbtn.ai-gen:hover{background:rgba(255,173,51,0.2);}
+
+/* VIDEO EMBED */
+.vid-wrap{
+  background:#000;border-radius:6px;overflow:hidden;
+  position:relative;margin:0 12px 10px;
+}
+.vid-wrap iframe{width:100%;height:140px;border:none;display:block;}
+.vid-label{
+  position:absolute;top:6px;left:6px;
+  background:var(--blue);color:#fff;
+  font-size:9px;font-family:'JetBrains Mono',monospace;
+  padding:2px 6px;border-radius:3px;letter-spacing:1px;
+}
+
+/* EMPTY / LOADING */
+.empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:80px 30px;gap:14px;color:var(--muted);text-align:center;
+}
+.empty-icon{font-size:52px;opacity:0.25;animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.empty-ttl{font-family:'Archivo Black',sans-serif;font-size:18px;letter-spacing:3px;color:var(--muted2);}
+.empty-sub{font-size:12px;max-width:220px;line-height:1.6;}
+
+.spinner{
+  display:flex;gap:8px;align-items:center;justify-content:center;padding:60px;
+}
+.sp-dot{
+  width:10px;height:10px;background:var(--red);border-radius:50%;
+  animation:sp 0.7s ease-in-out infinite alternate;
+}
+.sp-dot:nth-child(2){animation-delay:0.15s;background:var(--amber);}
+.sp-dot:nth-child(3){animation-delay:0.3s;background:var(--blue);}
+@keyframes sp{to{transform:translateY(-12px);opacity:0.3}}
+
+/* ═══ RIGHT PANEL ═══ */
+.rpanel{
+  background:var(--surface);border-left:1px solid var(--border);
+  overflow-y:auto;display:flex;flex-direction:column;
+}
+.rp-header{
+  padding:14px 16px;border-bottom:1px solid var(--border);
+  font-family:'Archivo Black',sans-serif;font-size:13px;
+  letter-spacing:3px;display:flex;align-items:center;gap:8px;
+}
+.rp-header span{
+  background:var(--blue-fb);color:#fff;width:22px;height:22px;
+  border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;
+}
+.rp-body{padding:14px;flex:1;display:flex;flex-direction:column;gap:12px;}
+
+.rp-empty{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:40px;text-align:center;color:var(--muted);
+}
+.rp-empty-icon{font-size:36px;opacity:0.2;}
+.rp-empty-txt{font-size:12px;line-height:1.6;}
+
+.article-preview{
+  background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;
+}
+.ap-img{width:100%;height:120px;object-fit:cover;display:block;}
+.ap-body{padding:10px;}
+.ap-src{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--amber);letter-spacing:1px;margin-bottom:4px;}
+.ap-title{font-size:12px;font-weight:700;line-height:1.4;color:var(--text);}
+.ap-url{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-top:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.field-label{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:5px;}
+.caption-box{
+  width:100%;background:var(--card);border:1px solid var(--border2);
+  color:var(--text);padding:10px;border-radius:6px;
+  font-family:'Syne',sans-serif;font-size:12px;line-height:1.6;
+  resize:vertical;min-height:90px;transition:border-color 0.2s;
+}
+.caption-box:focus{outline:none;border-color:var(--amber);}
+
+.media-row{display:flex;gap:6px;align-items:flex-start;}
+.media-row .inp{margin:0;flex:1;}
+.media-preview{
+  margin-top:6px;border-radius:6px;overflow:hidden;
+  background:var(--card);border:1px solid var(--border);
+}
+.media-preview img{width:100%;max-height:100px;object-fit:cover;display:block;}
+.media-preview .vid-src{
+  padding:8px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:var(--blue);display:flex;align-items:center;gap:6px;
+}
+
+/* FB MOCK PREVIEW */
+.fb-mock{
+  background:#18191A;border:1px solid #3A3B3C;border-radius:10px;overflow:hidden;
+}
+.fb-top{padding:10px 12px;display:flex;align-items:center;gap:10px;}
+.fb-av{
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue-fb),#4267b2);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;
+}
+.fb-info .fb-name{font-size:13px;font-weight:700;color:#E4E6EB;}
+.fb-info .fb-time{font-size:11px;color:#B0B3B8;display:flex;align-items:center;gap:4px;}
+.fb-caption{padding:0 12px 8px;font-size:12px;color:#E4E6EB;line-height:1.6;white-space:pre-wrap;}
+.fb-media{width:100%;display:block;max-height:160px;object-fit:cover;}
+.fb-media-vid{
+  background:#000;height:100px;display:flex;align-items:center;justify-content:center;
+  font-size:28px;
+}
+.fb-actions{
+  padding:6px 12px;border-top:1px solid #3A3B3C;
+  display:flex;gap:14px;
+}
+.fb-act{font-size:11px;color:#B0B3B8;display:flex;align-items:center;gap:4px;}
+
+.post-btns{display:flex;flex-direction:column;gap:6px;}
+.sched-row{display:flex;gap:6px;}
+.sched-row .inp{margin:0;flex:1;}
+.sched-row button{flex-shrink:0;width:auto;padding:8px 12px;}
+
+/* AUTO-POST QUEUE */
+.queue-section{border-top:1px solid var(--border);padding:14px;}
+.queue-item{
+  background:var(--card);border:1px solid var(--border);border-radius:6px;
+  padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px;
+}
+.queue-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.queue-dot.pending{background:var(--amber);animation:blink 1.5s ease-in-out infinite;}
+.queue-dot.done{background:var(--green);}
+.queue-dot.fail{background:var(--red);}
+.queue-txt{font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.queue-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--card2);border:1px solid var(--border2);
+  padding:10px 20px;border-radius:8px;z-index:9999;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  transition:transform 0.3s,opacity 0.3s;opacity:0;
+  display:flex;align-items:center;gap:8px;
+}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
+.toast.ok{border-color:var(--green);color:var(--green);}
+.toast.err{border-color:var(--red);color:var(--red);}
+.toast.inf{border-color:var(--blue);color:var(--blue);}
+
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="hdr">
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <div class="logo-text">BREAKING<b>FEED</b> <span style="font-size:11px;color:var(--muted);letter-spacing:1px;">PRO</span></div>
+  </div>
+  <div class="hdr-center">
+    <div class="live-badge">LIVE MONITOR</div>
+    <div class="clock" id="clock">--:--:-- UTC</div>
+  </div>
+  <div class="hdr-stats">
+    <div class="hdr-stat fetched"><div class="n" id="sFetched">0</div><div class="l">FETCHED</div></div>
+    <div class="hdr-stat posted"><div class="n" id="sPosted">0</div><div class="l">POSTED</div></div>
+    <div class="hdr-stat queued"><div class="n" id="sQueued">0</div><div class="l">QUEUED</div></div>
+  </div>
+</header>
+
+<!-- ═══ LAYOUT ═══ -->
+<div class="layout">
+
+  <!-- ═ SIDEBAR ═ -->
+  <aside class="sidebar">
+
+    <div class="sb-section">
+      <div class="sb-label">API Keys</div>
+      <input class="inp" type="password" id="newsKey" placeholder="NewsAPI.org key…" />
+      <input class="inp" type="password" id="fbToken" placeholder="Facebook Page Access Token…" />
+      <input class="inp" type="text" id="fbPageId" placeholder="Facebook Page ID" />
+      <input class="inp" type="text" id="fbPageName" placeholder="Page display name (optional)" />
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-label">Search Config</div>
+      <input class="inp" type="text" id="searchQ" value="war OR conflict OR Ukraine OR Gaza OR ceasefire OR airstrike" placeholder="Keywords…" />
+      <div class="inp-row">
+        <select class="inp" id="lang">
+          <option value="en">🇬🇧 English</option>
+          <option value="ar">🇸🇦 Arabic</option>
+          <option value="fr">🇫🇷 French</option>
+          <option value="de">🇩🇪 German</option>
+        </select>
+        <select class="inp" id="sortBy">
+          <option value="publishedAt">Latest</option>
+          <option value="relevancy">Relevance</option>
+          <option value="popularity">Popular</option>
+        </select>
+      </div>
+      <div class="chip-row" id="chipRow">
+        <div class="chip on" data-v="war">⚔ War</div>
+        <div class="chip on" data-v="conflict">💥 Conflict</div>
+        <div class="chip on" data-v="Gaza">🇵🇸 Gaza</div>
+        <div class="chip on" data-v="Ukraine">🇺🇦 Ukraine</div>
+        <div class="chip" data-v="military">🪖 Military</div>
+        <div class="chip" data-v="airstrike">✈ Airstrike</div>
+        <div class="chip" data-v="ceasefire">🕊 Ceasefire</div>
+        <div class="chip" data-v="world">🌍 World</div>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-label">Auto Settings</div>
+      <div class="toggle-row">
+        <span>Auto-refresh (5 min)</span>
+        <button class="toggle" id="tgRefresh" onclick="toggleRefresh(this)"></button>
+      </div>
+      <div class="toggle-row">
+        <span>Auto-post breaking</span>
+        <button class="toggle" id="tgAutoPost" onclick="toggleAutoPost(this)"></button>
+      </div>
+      <div class="toggle-row">
+        <span>AI caption on fetch</span>
+        <button class="toggle" id="tgAiAuto" onclick="this.classList.toggle('on')"></button>
+      </div>
+      <select class="inp" id="postInterval">
+        <option value="0">Post immediately</option>
+        <option value="5">Delay 5 min between posts</option>
+        <option value="15">Delay 15 min between posts</option>
+        <option value="30">Delay 30 min</option>
+      </select>
+    </div>
+
+    <div class="sb-section" style="flex:1;">
+      <button class="btn btn-red" id="fetchBtn" onclick="fetchNews()">⚡ FETCH NEWS NOW</button>
+      <button class="btn btn-ghost" onclick="postAllBreaking()">🚨 POST ALL BREAKING</button>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-label">Activity Log</div>
+      <div class="log-wrap"><div class="log-scroll" id="logEl">
+        <div class="log-line inf">[ INIT ] BreakingFeed PRO ready</div>
+      </div></div>
+    </div>
+
+  </aside>
+
+  <!-- ═ FEED ═ -->
+  <main class="feed-wrap">
+    <div class="feed-bar">
+      <div class="feed-bar-title">GLOBAL FEED</div>
+      <div class="filter-tabs">
+        <button class="ftab on" onclick="setTab('all',this)">ALL</button>
+        <button class="ftab" onclick="setTab('breaking',this)">🚨 BREAKING</button>
+        <button class="ftab" onclick="setTab('top',this)">🔥 TOP</button>
+        <button class="ftab" onclick="setTab('video',this)">📹 MEDIA</button>
+        <button class="ftab" onclick="setTab('unposted',this)">⏳ UNPOSTED</button>
+      </div>
+    </div>
+    <div class="feed-grid" id="feedEl">
+      <div class="empty">
+        <div class="empty-icon">📡</div>
+        <div class="empty-ttl">AWAITING SIGNAL</div>
+        <div class="empty-sub">Enter your NewsAPI.org key and click FETCH NEWS NOW to start monitoring</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ═ RIGHT PANEL ═ -->
+  <aside class="rpanel">
+    <div class="rp-header"><span>f</span> FACEBOOK COMPOSER</div>
+
+    <div id="rpEmpty" class="rp-body">
+      <div class="rp-empty">
+        <div class="rp-empty-icon">←</div>
+        <div class="rp-empty-txt">Select an article from the feed to compose a Facebook post</div>
+      </div>
+    </div>
+
+    <div id="rpComposer" style="display:none;" class="rp-body">
+
+      <div class="article-preview" id="apBox">
+        <div class="ap-body">
+          <div class="ap-src" id="apSrc">SOURCE</div>
+          <div class="ap-title" id="apTitle">Title</div>
+          <div class="ap-url" id="apUrl">url</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="field-label">POST CAPTION</div>
+        <textarea class="caption-box" id="captionBox" oninput="syncPreview()"></textarea>
+        <button class="btn btn-amber" onclick="aiCaption()" id="aiBtn" style="margin-top:6px;">✨ GENERATE AI CAPTION</button>
+      </div>
+
+      <div>
+        <div class="field-label">MEDIA LINK (image or video URL)</div>
+        <div class="media-row">
+          <input class="inp" type="text" id="mediaUrl" placeholder="https://…" oninput="previewMedia()" />
+        </div>
+        <div class="media-preview" id="mediaPrev" style="display:none;"></div>
+      </div>
+
+      <div>
+        <div class="field-label">FACEBOOK PREVIEW</div>
+        <div class="fb-mock">
+          <div class="fb-top">
+            <div class="fb-av">📰</div>
+            <div class="fb-info">
+              <div class="fb-name" id="fbMockName">Your Page</div>
+              <div class="fb-time">Just now · 🌐</div>
+            </div>
+          </div>
+          <div class="fb-caption" id="fbCapPrev">Your caption appears here…</div>
+          <div id="fbMediaPrev"></div>
+          <div class="fb-actions">
+            <div class="fb-act">👍 Like</div>
+            <div class="fb-act">💬 Comment</div>
+            <div class="fb-act">↗ Share</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="post-btns">
+        <button class="btn btn-blue" onclick="postNow()">📘 POST TO FACEBOOK NOW</button>
+        <button class="btn btn-ghost" onclick="copyAndOpen()">📋 COPY + OPEN FACEBOOK</button>
+        <div class="sched-row">
+          <input class="inp" type="datetime-local" id="schedTime" />
+          <button class="btn btn-ghost" onclick="schedPost()" style="font-size:10px;">⏰ SCHEDULE</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- QUEUE -->
+    <div class="queue-section" id="queueSection" style="display:none;">
+      <div class="sb-label">Post Queue</div>
+      <div id="queueEl"></div>
+    </div>
+
+  </aside>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let articles = [];
+let selIdx = null;
+let postedUrls = new Set();
+let totalPosted = 0;
+let autoRefreshTimer = null;
+let autoPostEnabled = false;
+let postQueue = [];
+let currentTab = 'all';
+
+const BRK = ['breaking','urgent','killed','attack','strike','explosion','invasion','offensive','ceasefire violation','airstrike','missile','bombardment','troops','combat','battle','evacuation order','casualties'];
+const TOP_SRCS = ['Reuters','BBC','Associated Press','AP','Al Jazeera','CNN','The Guardian','Bloomberg','NYT','New York Times'];
+
+// ══════════════════════════════════════════
+// CLOCK
+// ══════════════════════════════════════════
+setInterval(()=>{
+  const d=new Date();
+  document.getElementById('clock').textContent=d.toUTCString().replace('GMT','UTC').split(' ').slice(4).join(' ');
+},1000);
+
+// ══════════════════════════════════════════
+// LOG
+// ══════════════════════════════════════════
+function log(msg,type='inf'){
+  const el=document.getElementById('logEl');
+  const d=document.createElement('div');
+  d.className='log-line '+type;
+  d.textContent=`[ ${new Date().toLocaleTimeString()} ] ${msg}`;
+  el.prepend(d);
+  while(el.children.length>30)el.lastChild.remove();
+}
+
+// ══════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=(type==='ok'?'✓ ':type==='err'?'✗ ':'ℹ ')+msg;
+  t.className=`toast ${type} show`;
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// ══════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════
+function isBreaking(a){
+  const txt=(a.title+' '+(a.description||'')).toLowerCase();
+  return BRK.some(k=>txt.includes(k));
+}
+function isTop(a){
+  return TOP_SRCS.some(s=>a.source.name.toLowerCase().includes(s.toLowerCase()));
+}
+function hasMedia(a){
+  return !!a.urlToImage;
+}
+function timeAgo(ds){
+  const s=(Date.now()-new Date(ds))/1000;
+  if(s<60)return `${~~s}s ago`;
+  if(s<3600)return `${~~(s/60)}m ago`;
+  if(s<86400)return `${~~(s/3600)}h ago`;
+  return `${~~(s/86400)}d ago`;
+}
+function ytId(url){
+  const m=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/);
+  return m?m[1]:null;
+}
+
+// ══════════════════════════════════════════
+// CHIPS
+// ══════════════════════════════════════════
+document.querySelectorAll('.chip').forEach(c=>{
+  c.addEventListener('click',()=>{
+    c.classList.toggle('on');
+    const vals=[...document.querySelectorAll('.chip.on')].map(x=>x.dataset.v);
+    document.getElementById('searchQ').value=vals.join(' OR ')||'war';
+  });
+});
+
+// ══════════════════════════════════════════
+// FETCH NEWS
+// ══════════════════════════════════════════
+async function fetchNews(){
+  const key=document.getElementById('newsKey').value.trim();
+  if(!key){toast('Enter your NewsAPI.org key','err');return;}
+  const q=document.getElementById('searchQ').value||'war';
+  const lang=document.getElementById('lang').value;
+  const sort=document.getElementById('sortBy').value;
+
+  document.getElementById('feedEl').innerHTML='<div class="spinner"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>';
+  log(`Fetching: "${q.slice(0,40)}"…`,'inf');
+
+  try{
+    // Fetch both breaking/war AND top headlines in parallel
+    const [warRes, topRes] = await Promise.all([
+      fetch(`https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=${lang}&sortBy=${sort}&pageSize=20&apiKey=${key}`),
+      fetch(`https://newsapi.org/v2/top-headlines?category=general&language=${lang}&pageSize=10&apiKey=${key}`)
+    ]);
+    const warData=await warRes.json();
+    const topData=await topRes.json();
+
+    if(warData.status!=='ok') throw new Error(warData.message||'NewsAPI error');
+
+    // Merge & dedupe
+    const topArts=(topData.status==='ok'?topData.articles:[]).map(a=>({...a,_top:true}));
+    const warArts=(warData.articles||[]);
+    const seen=new Set();
+    articles=[...warArts,...topArts].filter(a=>{
+      if(!a.title||a.title==='[Removed]'||seen.has(a.url))return false;
+      seen.add(a.url);return true;
+    });
+
+    document.getElementById('sFetched').textContent=articles.length;
+    log(`Fetched ${articles.length} articles (${warArts.length} war/conflict + ${topArts.length} top)`, 'ok');
+
+    // Auto-generate AI captions if toggle on
+    if(document.getElementById('tgAiAuto').classList.contains('on')){
+      log('AI caption mode: ON — will generate on select','inf');
+    }
+
+    renderFeed();
+
+    // Auto-post breaking if enabled
+    if(autoPostEnabled){
+      const brk=articles.filter(a=>isBreaking(a)&&!postedUrls.has(a.url));
+      if(brk.length){
+        log(`Auto-posting ${brk.length} new breaking articles…`,'warn');
+        autoPostQueue(brk);
+      }
+    }
+
+  }catch(err){
+    document.getElementById('feedEl').innerHTML=`<div class="empty"><div class="empty-icon">⚠</div><div class="empty-ttl">FETCH FAILED</div><div class="empty-sub">${err.message}</div></div>`;
+    log('Fetch failed: '+err.message,'err');
+    toast(err.message,'err');
+  }
+}
+
+// ══════════════════════════════════════════
+// RENDER FEED
+// ══════════════════════════════════════════
+function renderFeed(){
+  let arts=articles;
+  if(currentTab==='breaking') arts=arts.filter(isBreaking);
+  else if(currentTab==='top') arts=arts.filter(a=>a._top||isTop(a));
+  else if(currentTab==='video') arts=arts.filter(hasMedia);
+  else if(currentTab==='unposted') arts=arts.filter(a=>!postedUrls.has(a.url));
+
+  if(!arts.length){
+    document.getElementById('feedEl').innerHTML=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-ttl">NO RESULTS</div><div class="empty-sub">Try a different filter or search term</div></div>`;
+    return;
+  }
+
+  document.getElementById('feedEl').innerHTML=arts.map((a,_)=>{
+    const i=articles.indexOf(a);
+    const brk=isBreaking(a);
+    const top=a._top||isTop(a);
+    const posted=postedUrls.has(a.url);
+    const yt=a.urlToImage?null:null; // YT would come from extra enrichment
+
+    return `<div class="ncard ${brk?'breaking-card':''} ${selIdx===i?'sel':''}" id="nc-${i}" onclick="selectArt(${i})" style="animation-delay:${(_*0.04).toFixed(2)}s">
+      <div class="card-top">
+        ${a.urlToImage?`<img class="card-thumb" src="${a.urlToImage}" onerror="this.outerHTML='<div class=card-thumb-ph>📰</div>'" loading="lazy">`:`<div class="card-thumb-ph">📰</div>`}
+        <div class="card-top-right">
+          <div class="card-badges">
+            ${brk?'<span class="badge brk">⚡ BREAKING</span>':''}
+            ${top?'<span class="badge top">🔥 TOP</span>':''}
+            ${a.urlToImage?'<span class="badge vid">📷 MEDIA</span>':''}
+            ${posted?'<span class="badge posted-badge">✓ POSTED</span>':''}
+            <span class="badge src">${a.source.name}</span>
+          </div>
+          <div class="card-title">${a.title}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-desc">${a.description||'No description available.'}</div>
+      </div>
+      <div class="card-foot">
+        <span class="card-time">${timeAgo(a.publishedAt)}</span>
+        <div class="card-btns">
+          <button class="cbtn ai-gen" onclick="event.stopPropagation();quickAiPost(${i})">✨ AI+Post</button>
+          <button class="cbtn post-now" onclick="event.stopPropagation();quickPost(${i})">📘 Post</button>
+          <button class="cbtn" onclick="event.stopPropagation();window.open('${a.url}','_blank')">🔗</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setTab(tab,btn){
+  currentTab=tab;
+  document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  if(articles.length) renderFeed();
+}
+
+// ══════════════════════════════════════════
+// SELECT ARTICLE
+// ══════════════════════════════════════════
+function selectArt(i){
+  selIdx=i;
+  const a=articles[i];
+  document.querySelectorAll('.ncard').forEach(c=>c.classList.remove('sel'));
+  const nc=document.getElementById('nc-'+i);
+  if(nc) nc.classList.add('sel');
+
+  // Fill composer
+  document.getElementById('rpEmpty').style.display='none';
+  document.getElementById('rpComposer').style.display='flex';
+
+  // Article preview
+  const apBox=document.getElementById('apBox');
+  apBox.innerHTML=`${a.urlToImage?`<img class="ap-img" src="${a.urlToImage}" onerror="this.remove()" />`:''}
+    <div class="ap-body">
+      <div class="ap-src">${a.source.name.toUpperCase()} · ${timeAgo(a.publishedAt)}</div>
+      <div class="ap-title">${a.title}</div>
+      <div class="ap-url">${a.url}</div>
+    </div>`;
+
+  // Default caption
+  const cap=buildCaption(a);
+  document.getElementById('captionBox').value=cap;
+
+  // Media
+  document.getElementById('mediaUrl').value=a.urlToImage||a.url||'';
+  previewMedia();
+
+  // FB mock name
+  const pgName=document.getElementById('fbPageName').value||'Your Page';
+  document.getElementById('fbMockName').textContent=pgName;
+
+  syncPreview();
+
+  // Auto AI if toggle on
+  if(document.getElementById('tgAiAuto').classList.contains('on')){
+    aiCaption();
+  }
+}
+
+function buildCaption(a){
+  const brk=isBreaking(a);
+  const emoji=brk?'🚨':'📰';
+  return `${emoji} ${brk?'BREAKING: ':''}${a.title}\n\n${a.description||''}\n\n📍 ${a.source.name}  |  ${new Date(a.publishedAt).toUTCString().slice(0,22)}\n🔗 ${a.url}\n\n#BreakingNews #WorldNews ${brk?'#Breaking':''} #${a.source.name.replace(/\s+/g,'')}`;
+}
+
+// ══════════════════════════════════════════
+// MEDIA PREVIEW
+// ══════════════════════════════════════════
+function previewMedia(){
+  const url=document.getElementById('mediaUrl').value.trim();
+  const prev=document.getElementById('mediaPrev');
+  const fbPrev=document.getElementById('fbMediaPrev');
+  if(!url){prev.style.display='none';fbPrev.innerHTML='';return;}
+  const vid=ytId(url);
+  if(vid){
+    prev.style.display='block';
+    prev.innerHTML=`<div class="vid-src">▶ YouTube video detected: ${url.slice(0,40)}…</div>`;
+    fbPrev.innerHTML=`<div class="fb-media-vid">▶ 🎬</div>`;
+  } else if(url.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i)||url.includes('urlToImage')||url.includes('img')){
+    prev.style.display='block';
+    prev.innerHTML=`<img src="${url}" style="width:100%;max-height:80px;object-fit:cover;display:block;" onerror="this.parentNode.style.display='none'">`;
+    fbPrev.innerHTML=`<img class="fb-media" src="${url}" onerror="this.remove()">`;
+  } else {
+    prev.style.display='none';
+    fbPrev.innerHTML='';
+  }
+}
+
+function syncPreview(){
+  const cap=document.getElementById('captionBox').value;
+  document.getElementById('fbCapPrev').textContent=cap;
+}
+
+// ══════════════════════════════════════════
+// AI CAPTION (Claude API)
+// ══════════════════════════════════════════
+async function aiCaption(articleIdx){
+  const i = articleIdx !== undefined ? articleIdx : selIdx;
+  if(i===null) return;
+  const a=articles[i];
+  const btn=document.getElementById('aiBtn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Generating…';}
+  log(`Generating AI caption for: "${a.title.slice(0,40)}…"`,'inf');
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        messages:[{role:'user',content:`Write a compelling, emotional Facebook post caption for this breaking news article. Use maximum 3 relevant emojis. Add 4-6 relevant hashtags at the end. Keep it under 180 words. Sound like a professional news page.\n\nHeadline: ${a.title}\nSummary: ${a.description||'N/A'}\nSource: ${a.source.name}\nURL: ${a.url}\n\nRespond with ONLY the caption text, no extra explanation.`}]
+      })
+    });
+    const data=await res.json();
+    const cap=data.content.map(c=>c.text||'').join('').trim();
+    if(i===selIdx){
+      document.getElementById('captionBox').value=cap;
+      syncPreview();
+    }
+    log('AI caption generated','ok');
+    return cap;
+  }catch(err){
+    log('AI caption failed: '+err.message,'err');
+    toast('AI caption failed','err');
+    return buildCaption(a);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='✨ GENERATE AI CAPTION';}
+  }
+}
+
+// ══════════════════════════════════════════
+// POST TO FACEBOOK
+// ══════════════════════════════════════════
+async function postToFB(articleIdx, caption){
+  const fbToken=document.getElementById('fbToken').value.trim();
+  const fbPageId=document.getElementById('fbPageId').value.trim();
+  if(!fbToken||!fbPageId){
+    toast('Enter Facebook Page Token & Page ID','err');
+    log('Missing Facebook credentials','err');
+    return false;
+  }
+  const a=articles[articleIdx];
+  const cap=caption||document.getElementById('captionBox').value;
+  const mediaUrl=articleIdx===selIdx?document.getElementById('mediaUrl').value.trim():(a.urlToImage||'');
+
+  log(`Posting: "${a.title.slice(0,40)}…"`,'inf');
+
+  try{
+    const body={message:cap,link:a.url,access_token:fbToken};
+    const res=await fetch(`https://graph.facebook.com/v19.0/${fbPageId}/feed`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.message);
+
+    postedUrls.add(a.url);
+    totalPosted++;
+    document.getElementById('sPosted').textContent=totalPosted;
+    log(`✓ Posted! FB ID: ${data.id}`,'ok');
+    toast('Posted to Facebook!','ok');
+    renderFeed();
+    addToQueue(a.title,data.id,'done');
+    return true;
+  }catch(err){
+    log(`Post failed: ${err.message}`,'err');
+    toast('Post failed: '+err.message,'err');
+    addToQueue(a.title,'ERROR','fail');
+    return false;
+  }
+}
+
+async function postNow(){
+  await postToFB(selIdx);
+}
+
+async function quickPost(i){
+  selectArt(i);
+  await postToFB(i);
+}
+
+async function quickAiPost(i){
+  selectArt(i);
+  const cap=await aiCaption(i);
+  await postToFB(i,cap);
+}
+
+function copyAndOpen(){
+  const cap=document.getElementById('captionBox').value;
+  const lnk=document.getElementById('mediaUrl').value||articles[selIdx]?.url||'';
+  navigator.clipboard.writeText(cap+'\n\n'+lnk).then(()=>{
+    toast('Copied! Opening Facebook…','ok');
+    setTimeout(()=>window.open('https://www.facebook.com','_blank'),500);
+  });
+}
+
+// ══════════════════════════════════════════
+// SCHEDULE
+// ══════════════════════════════════════════
+function schedPost(){
+  const t=document.getElementById('schedTime').value;
+  if(!t){toast('Pick a datetime first','err');return;}
+  const ms=new Date(t)-Date.now();
+  if(ms<0){toast('Time must be in the future','err');return;}
+  const i=selIdx;
+  const cap=document.getElementById('captionBox').value;
+  setTimeout(async()=>{await postToFB(i,cap);},ms);
+  document.getElementById('sQueued').textContent=++postQueue.length;
+  log(`Scheduled post for ${new Date(t).toLocaleString()}`,'warn');
+  toast(`Scheduled for ${new Date(t).toLocaleTimeString()}`,'inf');
+  addToQueue(articles[i].title,new Date(t).toLocaleTimeString(),'pending');
+}
+
+// ══════════════════════════════════════════
+// AUTO POST ALL BREAKING
+// ══════════════════════════════════════════
+async function postAllBreaking(){
+  const fbToken=document.getElementById('fbToken').value.trim();
+  const fbPageId=document.getElementById('fbPageId').value.trim();
+  if(!fbToken||!fbPageId){toast('Enter Facebook credentials first','err');return;}
+  const brk=articles.filter(a=>isBreaking(a)&&!postedUrls.has(a.url));
+  if(!brk.length){toast('No new breaking articles found','inf');return;}
+  toast(`Posting ${brk.length} breaking articles…`,'inf');
+  log(`Auto-posting ${brk.length} breaking articles`,'warn');
+  const delay=parseInt(document.getElementById('postInterval').value)||0;
+  for(let j=0;j<brk.length;j++){
+    const i=articles.indexOf(brk[j]);
+    if(j>0&&delay>0) await new Promise(r=>setTimeout(r,delay*60000));
+    const cap=await aiCaption(i);
+    await postToFB(i,cap);
+  }
+  toast(`Done posting ${brk.length} articles`,'ok');
+}
+
+async function autoPostQueue(arts){
+  const delay=parseInt(document.getElementById('postInterval').value)||0;
+  for(let j=0;j<arts.length;j++){
+    const i=articles.indexOf(arts[j]);
+    if(j>0&&delay>0) await new Promise(r=>setTimeout(r,delay*60000));
+    const cap=await aiCaption(i);
+    await postToFB(i,cap);
+  }
+}
+
+// ══════════════════════════════════════════
+// QUEUE UI
+// ══════════════════════════════════════════
+function addToQueue(title,info,status){
+  const qs=document.getElementById('queueSection');
+  const qel=document.getElementById('queueEl');
+  qs.style.display='block';
+  const d=document.createElement('div');
+  d.className='queue-item';
+  d.innerHTML=`<div class="queue-dot ${status}"></div><div class="queue-txt">${title.slice(0,45)}…</div><div class="queue-time">${info}</div>`;
+  qel.prepend(d);
+  postQueue.push({title,info,status});
+  document.getElementById('sQueued').textContent=postQueue.length;
+  while(qel.children.length>10) qel.lastChild.remove();
+}
+
+// ══════════════════════════════════════════
+// AUTO REFRESH
+// ══════════════════════════════════════════
+function toggleRefresh(btn){
+  btn.classList.toggle('on');
+  if(btn.classList.contains('on')){
+    fetchNews();
+    autoRefreshTimer=setInterval(fetchNews,5*60*1000);
+    log('Auto-refresh ON (every 5 min)','ok');
+  }else{
+    clearInterval(autoRefreshTimer);
+    log('Auto-refresh OFF','inf');
+  }
+}
+function toggleAutoPost(btn){
+  btn.classList.toggle('on');
+  autoPostEnabled=btn.classList.contains('on');
+  log(`Auto-post breaking: ${autoPostEnabled?'ON':'OFF'}`,autoPostEnabled?'warn':'inf');
+}
+</script>
+</body>
+</html>
