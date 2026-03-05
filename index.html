@@ -1325,6 +1325,37 @@ async function postToFB(articleIdx, caption){
   }
 }
 
+
+async function postNow(){
+  if(selIdx===null){toast('Select an article first','err');return;}
+  await postToFB(selIdx);
+}
+
+async function quickPost(i){
+  selectArt(i);
+  await new Promise(r=>setTimeout(r,100));
+  await postToFB(i);
+}
+
+async function quickAiPost(i){
+  selectArt(i);
+  await new Promise(r=>setTimeout(r,100));
+  const cap=await aiCaption(i);
+  await postToFB(i,cap);
+}
+
+function copyAndOpen(){
+  if(selIdx===null){toast('Select an article first','err');return;}
+  const cap=document.getElementById('captionBox').value;
+  const lnk=articles[selIdx]?.url||'';
+  navigator.clipboard.writeText(cap+'\n\n'+lnk).then(()=>{
+    toast('Copied! Opening Facebook…','ok');
+    setTimeout(()=>window.open('https://www.facebook.com','_blank'),500);
+  }).catch(()=>{
+    toast('Copy failed — check browser permissions','err');
+  });
+}
+
 // ══════════════════════════════════════════
 // VIDEO UPLOAD TO FACEBOOK
 // ══════════════════════════════════════════
