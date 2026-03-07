@@ -31,3 +31,8 @@
   from = "/api/news/fetch"
   to = "/.netlify/functions/fetch-news"
   status = 200
+
+[[redirects]]
+  from = "/api/ai-caption"
+  to = "/.netlify/functions/ai-caption"
+  status = 200

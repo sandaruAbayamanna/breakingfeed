@@ -1400,28 +1400,14 @@ async function translateToSinhala() {
   setTranslateStatus('Translating to Sinhala…', true);
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/ai-caption', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: `Translate the following Facebook news post caption to Sinhala (සිංහල). 
-Keep all emojis exactly as they are in the same positions.
-Keep hashtags in English but you can add Sinhala hashtags too like #ශ්‍රීලංකා #ලෝකඅවධානය.
-Make it natural, fluent Sinhala suitable for a Sri Lankan news Facebook page audience.
-Return ONLY the translated Sinhala text, nothing else.
-
-Caption to translate:
-${sourceText}`
-        }]
-      })
+      body: JSON.stringify({ mode: 'translate', caption: sourceText })
     });
-
     const data = await res.json();
-    const translated = data.content?.map(c => c.text||'').join('').trim();
+    if(data.error) throw new Error(data.error);
+    const translated = data.text;
     if(!translated) throw new Error('Empty translation response');
 
     if(currentLang === 'both') {
@@ -1472,31 +1458,33 @@ async function aiCaption(articleIdx){
   const a=articles[i];
   const btn=document.getElementById('aiBtn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Generating…';}
-  log(`Generating AI caption for: "${a.title.slice(0,40)}…"`,'inf');
+  log(`Generating caption for: "${a.title.slice(0,40)}…"`,'inf');
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
+    const res=await fetch('/api/ai-caption',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:[{role:'user',content:`Write a compelling, emotional Facebook post caption for this breaking news article. Use maximum 3 relevant emojis. Add 4-6 relevant hashtags at the end. Keep it under 180 words. Sound like a professional news page.\n\nHeadline: ${a.title}\nSummary: ${a.description||'N/A'}\nSource: ${a.source.name}\nURL: ${a.url}\n\nRespond with ONLY the caption text, no extra explanation.`}]
-      })
+      body:JSON.stringify({mode:'caption',title:a.title,description:a.description||'',source:a.source.name,url:a.url})
     });
     const data=await res.json();
-    const cap=data.content.map(c=>c.text||'').join('').trim();
+    if(data.error) throw new Error(data.error);
+    const cap=data.text;
     if(i===selIdx){
-      document.getElementById('captionBox').value=cap;
-      syncPreview();
+      if(currentLang==='both'){
+        document.getElementById('captionEn').value=cap;
+        syncDualPreview();
+      } else {
+        document.getElementById('captionBox').value=cap;
+        syncPreview();
+      }
     }
-    log('AI caption generated','ok');
+    log('Caption generated','ok');
     return cap;
   }catch(err){
-    log('AI caption failed: '+err.message,'err');
-    toast('AI caption failed','err');
+    log('Caption failed: '+err.message,'err');
+    toast('Caption failed','err');
     return buildCaption(a);
   }finally{
-    if(btn){btn.disabled=false;btn.textContent='✨ GENERATE AI CAPTION';}
+    if(btn){btn.disabled=false;btn.textContent='✨ Auto Caption';}
   }
 }
 
