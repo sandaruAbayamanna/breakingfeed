@@ -456,6 +456,47 @@ select.inp{cursor:pointer;}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:8px;}
 .video-selected-box video{width:100%;border-radius:6px;max-height:100px;}
 
+
+.lang-toggle-row{display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.lang-btn{
+  padding:5px 12px;font-size:10px;font-family:'JetBrains Mono',monospace;
+  border:1px solid var(--border2);color:var(--muted);background:transparent;
+  border-radius:4px;cursor:pointer;transition:all 0.15s;flex:1;text-align:center;
+}
+.lang-btn.on{background:var(--card2);border-color:var(--text);color:var(--text);}
+.lang-btn.sinhala.on{background:linear-gradient(135deg,#8B4513,#D2691E);border-color:#D2691E;color:#fff;}
+.lang-btn.english.on{background:var(--blue-fb);border-color:var(--blue-fb);color:#fff;}
+.caption-wrap{position:relative;}
+.caption-lang-badge{
+  position:absolute;top:6px;right:8px;
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  padding:2px 7px;border-radius:3px;letter-spacing:1px;
+  pointer-events:none;
+}
+.caption-lang-badge.si{background:rgba(139,69,19,0.2);color:#D2691E;border:1px solid rgba(210,105,30,0.3);}
+.caption-lang-badge.en{background:rgba(24,119,242,0.15);color:var(--blue-fb);border:1px solid rgba(24,119,242,0.2);}
+.translate-status{
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:var(--muted2);margin-top:4px;min-height:16px;
+  display:flex;align-items:center;gap:6px;
+}
+.translate-status .dot{
+  width:6px;height:6px;border-radius:50%;background:var(--amber);
+  animation:blink 0.8s ease-in-out infinite;flex-shrink:0;
+}
+.btn-sinhala{
+  background:linear-gradient(135deg,#8B4513,#C45A1A);
+  color:#fff;border:none;
+}
+.btn-sinhala:hover{background:linear-gradient(135deg,#7A3B10,#B34F16);transform:translateY(-1px);}
+.dual-caption{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.dual-caption .caption-wrap{display:flex;flex-direction:column;}
+.dual-caption .caption-box{flex:1;min-height:80px;}
+.dual-label{font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:2px;margin-bottom:4px;display:flex;align-items:center;gap:5px;}
+.dual-label.si{color:#D2691E;}
+.dual-label.en{color:var(--blue-fb);}
+
 </style>
 </head>
 <body>
@@ -609,9 +650,40 @@ select.inp{cursor:pointer;}
       </div>
 
       <div>
-        <div class="field-label">POST CAPTION</div>
-        <textarea class="caption-box" id="captionBox" oninput="syncPreview()"></textarea>
-        <button class="btn btn-amber" onclick="aiCaption()" id="aiBtn" style="margin-top:6px;">✨ GENERATE AI CAPTION</button>
+        <div class="field-label">POST CAPTION & LANGUAGE</div>
+
+        <!-- Language selector -->
+        <div class="lang-toggle-row">
+          <button class="lang-btn english on" id="langEn" onclick="setLang('en',this)">🇬🇧 English</button>
+          <button class="lang-btn sinhala" id="langSi" onclick="setLang('si',this)">🇱🇰 සිංහල</button>
+          <button class="lang-btn" id="langBoth" onclick="setLang('both',this)">🌐 Both</button>
+        </div>
+
+        <!-- Single caption (English or Sinhala) -->
+        <div id="singleCaptionWrap" class="caption-wrap">
+          <textarea class="caption-box" id="captionBox" oninput="syncPreview()"></textarea>
+          <span class="caption-lang-badge en" id="captionLangBadge">EN</span>
+        </div>
+
+        <!-- Dual caption (English + Sinhala side by side) -->
+        <div id="dualCaptionWrap" class="dual-caption" style="display:none;">
+          <div class="caption-wrap">
+            <div class="dual-label en">🇬🇧 ENGLISH</div>
+            <textarea class="caption-box" id="captionEn" oninput="syncDualPreview()" style="font-size:11px;"></textarea>
+          </div>
+          <div class="caption-wrap">
+            <div class="dual-label si">🇱🇰 සිංහල</div>
+            <textarea class="caption-box" id="captionSi" oninput="syncDualPreview()" style="font-size:12px;font-family:sans-serif;"></textarea>
+          </div>
+        </div>
+
+        <div class="translate-status" id="translateStatus"></div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button class="btn btn-amber" onclick="aiCaption()" id="aiBtn" style="flex:1;">✨ AI Caption</button>
+          <button class="btn btn-sinhala" onclick="translateToSinhala()" id="siBtn" style="flex:1;">🇱🇰 Translate සිංහල</button>
+        </div>
       </div>
 
       <div>
@@ -989,6 +1061,11 @@ function selectArt(i){
 
   syncPreview();
 
+  // Reset language to English on new article selection
+  currentLang = 'en';
+  const langEnBtn = document.getElementById('langEn');
+  if(langEnBtn) setLang('en', langEnBtn);
+
   // Reset post type to text+link on new selection
   setPostType('text', document.getElementById('ptText'));
   document.getElementById('mediaUrl').value = a.url||'';
@@ -1263,9 +1340,131 @@ function previewMedia(){
   // handled by post type panels now
 }
 
+// ══════════════════════════════════════════
+// LANGUAGE & TRANSLATION
+// ══════════════════════════════════════════
+let currentLang = 'en'; // en | si | both
+
+function setLang(lang, btn) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+
+  const single = document.getElementById('singleCaptionWrap');
+  const dual   = document.getElementById('dualCaptionWrap');
+  const badge  = document.getElementById('captionLangBadge');
+  const siBtn  = document.getElementById('siBtn');
+
+  if(lang === 'both') {
+    single.style.display = 'none';
+    dual.style.display   = 'grid';
+    // Sync existing caption to English side
+    document.getElementById('captionEn').value = document.getElementById('captionBox').value;
+    siBtn.textContent = '🇱🇰 Translate Both';
+  } else {
+    single.style.display = 'block';
+    dual.style.display   = 'none';
+    if(lang === 'si') {
+      badge.className = 'caption-lang-badge si';
+      badge.textContent = 'සි';
+      siBtn.textContent = '🇱🇰 Translate සිංහල';
+    } else {
+      badge.className = 'caption-lang-badge en';
+      badge.textContent = 'EN';
+      siBtn.textContent = '🇱🇰 Translate සිංහල';
+    }
+  }
+  syncPreview();
+}
+
+function setTranslateStatus(msg, loading=false) {
+  const el = document.getElementById('translateStatus');
+  if(!el) return;
+  if(!msg) { el.innerHTML=''; return; }
+  el.innerHTML = loading
+    ? `<div class="dot"></div>${msg}`
+    : msg;
+}
+
+// ── Translate caption to Sinhala using Claude API ──
+async function translateToSinhala() {
+  const btn = document.getElementById('siBtn');
+  const sourceText = currentLang === 'both'
+    ? document.getElementById('captionEn').value.trim()
+    : document.getElementById('captionBox').value.trim();
+
+  if(!sourceText) { toast('Write a caption first then translate', 'err'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Translating…';
+  setTranslateStatus('Translating to Sinhala…', true);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `Translate the following Facebook news post caption to Sinhala (සිංහල). 
+Keep all emojis exactly as they are in the same positions.
+Keep hashtags in English but you can add Sinhala hashtags too like #ශ්‍රීලංකා #ලෝකඅවධානය.
+Make it natural, fluent Sinhala suitable for a Sri Lankan news Facebook page audience.
+Return ONLY the translated Sinhala text, nothing else.
+
+Caption to translate:
+${sourceText}`
+        }]
+      })
+    });
+
+    const data = await res.json();
+    const translated = data.content?.map(c => c.text||'').join('').trim();
+    if(!translated) throw new Error('Empty translation response');
+
+    if(currentLang === 'both') {
+      document.getElementById('captionSi').value = translated;
+      syncDualPreview();
+    } else {
+      // Switch to Sinhala mode and set caption
+      document.getElementById('captionBox').value = translated;
+      setLang('si', document.getElementById('langSi'));
+      syncPreview();
+    }
+
+    setTranslateStatus('✓ Translated to Sinhala successfully');
+    setTimeout(() => setTranslateStatus(''), 3000);
+    log('Caption translated to Sinhala', 'ok');
+    toast('Translated to සිංහල! ✓', 'ok');
+
+  } catch(err) {
+    setTranslateStatus('✗ Translation failed: ' + err.message);
+    log('Translation failed: ' + err.message, 'err');
+    toast('Translation failed', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = currentLang === 'both' ? '🇱🇰 Translate Both' : '🇱🇰 Translate සිංහල';
+  }
+}
+
+// Sync dual caption preview — combine English + Sinhala in FB preview
+function syncDualPreview() {
+  const en = document.getElementById('captionEn')?.value || '';
+  const si = document.getElementById('captionSi')?.value || '';
+  const combined = [en, si].filter(Boolean).join('
+
+─────────────
+
+');
+  document.getElementById('fbCapPrev').textContent = combined || 'Your caption appears here…';
+}
+
 function syncPreview(){
+  if(currentLang === 'both') { syncDualPreview(); return; }
   const cap=document.getElementById('captionBox').value;
-  document.getElementById('fbCapPrev').textContent=cap;
+  document.getElementById('fbCapPrev').textContent=cap||'Your caption appears here…';
 }
 
 // ══════════════════════════════════════════
@@ -1316,7 +1515,22 @@ async function postToFB(articleIdx, caption){
     return false;
   }
   const a=articles[articleIdx];
-  const cap=caption||(articleIdx===selIdx?document.getElementById('captionBox').value:buildCaption(a));
+  // Get caption based on current language mode
+  let cap = caption;
+  if(!cap) {
+    if(articleIdx === selIdx) {
+      if(currentLang === 'both') {
+        // Combine English + Sinhala with separator for dual posts
+        const en = document.getElementById('captionEn')?.value?.trim() || '';
+        const si = document.getElementById('captionSi')?.value?.trim() || '';
+        cap = [en, si].filter(Boolean).join('\n\n') || buildCaption(a);
+      } else {
+        cap = document.getElementById('captionBox').value || buildCaption(a);
+      }
+    } else {
+      cap = buildCaption(a);
+    }
+  }
   const postType = articleIdx===selIdx ? currentPostType : 'text';
 
   log(`Posting [${postType}]: "${a.title.slice(0,35)}…"`, 'inf');
