@@ -484,8 +484,19 @@ select.inp{cursor:pointer;}
   <aside class="sidebar">
 
     <div class="sb-section">
-      <div class="sb-label">API Keys</div>
-      <input class="inp" type="password" id="newsKey" placeholder="NewsAPI.org key…" />
+      <div class="sb-label">News Source</div>
+      <select class="inp" id="newsProvider" onchange="onProviderChange()">
+        <option value="gnews">⚡ GNews.io — Real-time (recommended)</option>
+        <option value="newsdata">🌍 NewsData.io — Real-time + Video</option>
+        <option value="guardian">📰 The Guardian — Free, no delay</option>
+        <option value="newsapi">🕐 NewsAPI.org — 24h delay (dev plan)</option>
+      </select>
+      <input class="inp" type="password" id="newsKey" placeholder="API key for selected source…" />
+      <div id="apiHint" style="font-size:10px;color:var(--amber);font-family:'JetBrains Mono',monospace;margin-top:-4px;margin-bottom:6px;line-height:1.5;"></div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sb-label">Facebook</div>
       <input class="inp" type="password" id="fbToken" placeholder="Facebook Page Access Token…" />
       <input class="inp" type="text" id="fbPageId" placeholder="Facebook Page ID" />
       <input class="inp" type="text" id="fbPageName" placeholder="Page display name (optional)" />
@@ -794,59 +805,92 @@ document.querySelectorAll('.chip').forEach(c=>{
 // ══════════════════════════════════════════
 // FETCH NEWS
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// PROVIDER HINT MESSAGES
+// ══════════════════════════════════════════
+const PROVIDER_HINTS = {
+  gnews:    '⚡ Real-time · Free: 100 req/day · Get key: gnews.io',
+  newsdata: '🌍 Real-time · Free: 200 req/day · Get key: newsdata.io',
+  guardian: '📰 Real-time · Free: 500 req/day · Get key: open-platform.theguardian.com',
+  newsapi:  '⚠ 24hr DELAY on free plan · Get key: newsapi.org',
+};
+const PROVIDER_NAMES = {
+  gnews:'GNews.io', newsdata:'NewsData.io', guardian:'The Guardian', newsapi:'NewsAPI.org'
+};
+
+function onProviderChange() {
+  const p = document.getElementById('newsProvider').value;
+  const hint = document.getElementById('apiHint');
+  hint.textContent = PROVIDER_HINTS[p] || '';
+  hint.style.color = p === 'newsapi' ? 'var(--red)' : 'var(--amber)';
+  const keyInp = document.getElementById('newsKey');
+  keyInp.placeholder = `${PROVIDER_NAMES[p]} API key…`;
+}
+
+// Run on load
+document.addEventListener('DOMContentLoaded', onProviderChange);
+
 async function fetchNews(){
-  const key=document.getElementById('newsKey').value.trim();
-  if(!key){toast('Enter your NewsAPI.org key','err');return;}
-  const q=document.getElementById('searchQ').value||'war';
-  const lang=document.getElementById('lang').value;
-  const sort=document.getElementById('sortBy').value;
+  const key = document.getElementById('newsKey').value.trim();
+  const provider = document.getElementById('newsProvider').value;
+  if(!key){ toast(`Enter your ${PROVIDER_NAMES[provider]} key`, 'err'); return; }
+
+  const q    = document.getElementById('searchQ').value || 'war conflict';
+  const lang = document.getElementById('lang').value;
+  const sort = document.getElementById('sortBy').value;
 
   document.getElementById('feedEl').innerHTML='<div class="spinner"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>';
-  log(`Fetching: "${q.slice(0,40)}"…`,'inf');
+  log(`[${PROVIDER_NAMES[provider]}] Fetching: "${q.slice(0,40)}"…`, 'inf');
 
-  try{
-    // Fetch both breaking/war AND top headlines in parallel
-    const [warRes, topRes] = await Promise.all([
-      fetch(`/api/news/everything?q=${encodeURIComponent(q)}&language=${lang}&sortBy=${sort}&pageSize=20&apiKey=${key}`),
-      fetch(`/api/news/top-headlines?category=general&language=${lang}&pageSize=10&apiKey=${key}`)
+  try {
+    // Fetch war/conflict search + top headlines in parallel
+    const [searchRes, topRes] = await Promise.all([
+      fetch('/api/news/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey: key, query: q, language: lang, sortBy: sort, pageSize: 20, type: 'search' })
+      }),
+      fetch('/api/news/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey: key, query: q, language: lang, sortBy: sort, pageSize: 10, type: 'headlines' })
+      })
     ]);
-    const warData=await warRes.json();
-    const topData=await topRes.json();
 
-    if(warData.status!=='ok') throw new Error(warData.message||'NewsAPI error');
+    const searchData = await searchRes.json();
+    const topData    = await topRes.json();
 
-    // Merge & dedupe
-    const topArts=(topData.status==='ok'?topData.articles:[]).map(a=>({...a,_top:true}));
-    const warArts=(warData.articles||[]);
-    const seen=new Set();
-    articles=[...warArts,...topArts].filter(a=>{
-      if(!a.title||a.title==='[Removed]'||seen.has(a.url))return false;
-      seen.add(a.url);return true;
+    if (searchData.status !== 'ok') throw new Error(searchData.message || 'API error');
+
+    // Merge & dedupe — mark top headlines
+    const topArts = (topData.articles || []).map(a => ({...a, _top: true}));
+    const seen = new Set();
+    articles = [...(searchData.articles||[]), ...topArts].filter(a => {
+      if (!a.title || a.title === '[Removed]' || seen.has(a.url)) return false;
+      seen.add(a.url); return true;
     });
 
-    document.getElementById('sFetched').textContent=articles.length;
-    log(`Fetched ${articles.length} articles (${warArts.length} war/conflict + ${topArts.length} top)`, 'ok');
+    document.getElementById('sFetched').textContent = articles.length;
+    log(`✓ ${articles.length} articles via ${PROVIDER_NAMES[provider]}`, 'ok');
 
-    // Auto-generate AI captions if toggle on
-    if(document.getElementById('tgAiAuto').classList.contains('on')){
-      log('AI caption mode: ON — will generate on select','inf');
+    if (document.getElementById('tgAiAuto').classList.contains('on')) {
+      log('AI caption mode: ON — will generate on select', 'inf');
     }
 
     renderFeed();
 
-    // Auto-post breaking if enabled
-    if(autoPostEnabled){
-      const brk=articles.filter(a=>isBreaking(a)&&!postedUrls.has(a.url));
-      if(brk.length){
-        log(`Auto-posting ${brk.length} new breaking articles…`,'warn');
+    if (autoPostEnabled) {
+      const brk = articles.filter(a => isBreaking(a) && !postedUrls.has(a.url));
+      if (brk.length) {
+        log(`Auto-posting ${brk.length} new breaking articles…`, 'warn');
         autoPostQueue(brk);
       }
     }
 
-  }catch(err){
+  } catch(err) {
     document.getElementById('feedEl').innerHTML=`<div class="empty"><div class="empty-icon">⚠</div><div class="empty-ttl">FETCH FAILED</div><div class="empty-sub">${err.message}</div></div>`;
-    log('Fetch failed: '+err.message,'err');
-    toast(err.message,'err');
+    log('Fetch failed: '+err.message, 'err');
+    toast(err.message, 'err');
   }
 }
 
@@ -1363,136 +1407,73 @@ async function postVideoToFB(articleIdx, cap) {
   const fbToken=document.getElementById('fbToken').value.trim();
   const fbPageId=document.getElementById('fbPageId').value.trim();
   const a=articles[articleIdx];
-  const title=document.getElementById('videoTitle').value.trim()||a.title.slice(0,80);
 
-  // ── Via Extracted Video ──
+  // Determine the video URL to use
+  let videoUrl = '';
+  let videoLabel = '';
+
   if(currentVideoTab==='extract'){
     if(!selectedExtractedVideo){toast('Extract a video from an article first','err');return false;}
-    const v = selectedExtractedVideo;
-    // YouTube/Vimeo: Facebook can embed these via file_url
-    // Direct MP4: Facebook fetches directly
-    try{
-      showProgress(15,'Sending extracted video to Facebook…');
-      const body={pageId:fbPageId,access_token:fbToken,description:cap,title,file_url:v.url};
-      const res=await fetch('/api/fb/video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      const data=await res.json();
-      if(data.error)throw new Error(data.error.message);
-      showProgress(100,'Video posted!');
-      setTimeout(hideProgress,2000);
-      markPosted(a,data.id,articleIdx);
-      return true;
-    }catch(err){
-      hideProgress();
-      log('Extracted video post failed: '+err.message,'err');
-      toast('Video failed: '+err.message,'err');
-      addToQueue(a.title,'ERROR','fail');
-      return false;
-    }
-  }
-
-  // ── Via URL ──
-  if(currentVideoTab==='url'){
-    const videoUrl=document.getElementById('videoUrl').value.trim();
+    videoUrl = selectedExtractedVideo.url;
+    videoLabel = selectedExtractedVideo.label;
+  } else if(currentVideoTab==='url'){
+    videoUrl = document.getElementById('videoUrl').value.trim();
     if(!videoUrl){toast('Enter a video URL first','err');return false;}
-    try{
-      showProgress(10,'Sending video URL to Facebook…');
-      const body={pageId:fbPageId,access_token:fbToken,description:cap,title,file_url:videoUrl};
-      const res=await fetch('/api/fb/video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      const data=await res.json();
-      if(data.error)throw new Error(data.error.message);
-      showProgress(100,'Upload complete!');
-      setTimeout(hideProgress,2000);
-      markPosted(a,data.id,articleIdx);
-      return true;
-    }catch(err){
-      hideProgress();
-      log('Video post failed: '+err.message,'err');
-      toast('Video failed: '+err.message,'err');
-      addToQueue(a.title,'ERROR','fail');
-      return false;
-    }
+    videoLabel = videoUrl;
   }
 
-  // ── Via File Upload (Resumable Upload API) ──
-  if(!selectedVideoFile){toast('Select a video file first','err');return false;}
+  // ── SMART VIDEO POSTING ──
+  // Facebook /videos endpoint requires special App Review permissions.
+  // Instead we post via /feed as a link post — Facebook auto-embeds
+  // MP4 and YouTube/Vimeo links as playable video inside the post.
+  // This only needs pages_manage_posts which we already have. ✅
+
+  log(`Posting video as link post: ${videoLabel.slice(0,40)}…`, 'inf');
+  showProgress(20, 'Posting video to Facebook…');
+
   try{
-    showProgress(5,'Initializing upload…');
-    log(`Uploading video file: ${selectedVideoFile.name} (${(selectedVideoFile.size/1024/1024).toFixed(1)} MB)`,'inf');
+    // Build caption — append video URL so Facebook scrapes and embeds it
+    const isYT  = videoUrl.includes('youtube') || videoUrl.includes('youtu.be');
+    const isVim = videoUrl.includes('vimeo.com');
+    const isMp4 = videoUrl.match(/\.mp4/i);
 
-    // Step 1: Initialize resumable upload session
-    const initUrl=`https://graph.facebook.com/v19.0/${fbPageId}/videos`;
-    const initParams=new URLSearchParams({
-      upload_phase:'start',
-      file_size:selectedVideoFile.size,
-      access_token:fbToken
+    // For YouTube/Vimeo use the video URL as the link (FB embeds it natively)
+    // For direct MP4 include URL in message so FB scrapes the video
+    const linkToPost = (isYT || isVim) ? videoUrl : a.url;
+    const fullCaption = isMp4
+      ? `${cap}
+
+🎬 Video: ${videoUrl}`
+      : cap;
+
+    const body = {
+      pageId: fbPageId,
+      message: fullCaption,
+      link: linkToPost,
+      access_token: fbToken
+    };
+
+    const res = await fetch('/api/fb/post', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
     });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error.message);
 
-    // We route through our Netlify function to avoid CORS
-    const initRes=await fetch('/api/fb/video',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        pageId:fbPageId,
-        access_token:fbToken,
-        description:cap,
-        title,
-        file_size:selectedVideoFile.size,
-        upload_phase:'start'
-      })
-    });
-    const initData=await initRes.json();
-    if(initData.error)throw new Error(initData.error.message);
-
-    showProgress(20,'Uploading video chunks…');
-
-    // Step 2: Upload file in chunks via fetch (direct to FB for binary data)
-    const uploadId=initData.upload_session_id||initData.video_id;
-    const startOffset=parseInt(initData.start_offset||0);
-    const endOffset=parseInt(initData.end_offset||selectedVideoFile.size);
-
-    // Upload binary chunk
-    const chunk=selectedVideoFile.slice(startOffset,endOffset);
-    const formData=new FormData();
-    formData.append('access_token',fbToken);
-    formData.append('upload_phase','transfer');
-    formData.append('upload_session_id',uploadId);
-    formData.append('start_offset',startOffset);
-    formData.append('video_file_chunk',chunk,selectedVideoFile.name);
-
-    showProgress(50,'Transferring video…');
-    const uploadRes=await fetch(`https://graph.facebook.com/v19.0/${fbPageId}/videos`,{
-      method:'POST',body:formData
-    });
-    const uploadData=await uploadRes.json();
-    if(uploadData.error)throw new Error(uploadData.error.message);
-
-    // Step 3: Finish upload
-    showProgress(85,'Finalizing…');
-    const finishData=new FormData();
-    finishData.append('access_token',fbToken);
-    finishData.append('upload_phase','finish');
-    finishData.append('upload_session_id',uploadId);
-    finishData.append('description',cap);
-    finishData.append('title',title);
-
-    const finishRes=await fetch(`https://graph.facebook.com/v19.0/${fbPageId}/videos`,{
-      method:'POST',body:finishData
-    });
-    const finishResult=await finishRes.json();
-    if(finishResult.error)throw new Error(finishResult.error.message);
-
-    showProgress(100,'Video posted!');
-    setTimeout(hideProgress,2000);
-    markPosted(a,finishResult.id||uploadId,articleIdx);
+    showProgress(100, 'Video posted!');
+    setTimeout(hideProgress, 2000);
+    markPosted(a, data.id, articleIdx);
     return true;
 
   }catch(err){
     hideProgress();
-    log('Video upload failed: '+err.message,'err');
-    toast('Upload failed: '+err.message,'err');
+    log('Video post failed: '+err.message,'err');
+    toast('Post failed: '+err.message,'err');
     addToQueue(a.title,'ERROR','fail');
     return false;
   }
+
 }
 
 function showProgress(pct, msg){

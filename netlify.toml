@@ -26,3 +26,8 @@
   from = "/api/extract-video"
   to = "/.netlify/functions/extract-video"
   status = 200
+
+[[redirects]]
+  from = "/api/news/fetch"
+  to = "/.netlify/functions/fetch-news"
+  status = 200
