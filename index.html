@@ -1453,11 +1453,7 @@ ${sourceText}`
 function syncDualPreview() {
   const en = document.getElementById('captionEn')?.value || '';
   const si = document.getElementById('captionSi')?.value || '';
-  const combined = [en, si].filter(Boolean).join('
-
-─────────────
-
-');
+  const combined = [en, si].filter(Boolean).join('\n\n─────────────\n\n');
   document.getElementById('fbCapPrev').textContent = combined || 'Your caption appears here…';
 }
 
