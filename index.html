@@ -1123,8 +1123,8 @@ async function postToAllTargets(articleIdx) {
         }
       }
 
-      // Post
-      const ok = await postNow(articleIdx, true);
+      // Post — pass account directly so credentials never get lost
+      const ok = await postToFB(articleIdx !== undefined ? articleIdx : selIdx, null, acc);
       if (ok !== false) {
         successCount++;
         log(`✓ Posted to ${acc.name}`, 'ok');
@@ -1861,9 +1861,9 @@ async function aiCaption(articleIdx){
 
 // ══════════════════════════════════════════
 // POST TO FACEBOOK
-async function postToFB(articleIdx, caption){
-  // Always read credentials fresh from fbAccounts — never rely on hidden inputs
-  const activeAcc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+async function postToFB(articleIdx, caption, injectedAcc){
+  // Use injected account if provided, otherwise fall back to active account
+  const activeAcc = injectedAcc || fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
   if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
   const fbToken  = activeAcc.token.trim();
   const fbPageId = activeAcc.pageId.trim();
@@ -1895,7 +1895,7 @@ async function postToFB(articleIdx, caption){
 
   // ── VIDEO POST ──
   if(postType==='video'){
-    return await postVideoToFB(articleIdx, cap);
+    return await postVideoToFB(articleIdx, cap, activeAcc);
   }
 
   // ── IMAGE POST ──
@@ -1988,9 +1988,9 @@ function copyAndOpen(){
 // ══════════════════════════════════════════
 // VIDEO UPLOAD TO FACEBOOK
 // ══════════════════════════════════════════
-async function postVideoToFB(articleIdx, cap) {
-  // Always read credentials fresh from fbAccounts — never rely on hidden inputs
-  const activeAcc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+async function postVideoToFB(articleIdx, cap, injectedAcc) {
+  // Use injected account if provided, otherwise fall back to active account
+  const activeAcc = injectedAcc || fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
   if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
   const fbToken  = activeAcc.token.trim();
   const fbPageId = activeAcc.pageId.trim();
