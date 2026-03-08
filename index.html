@@ -866,6 +866,14 @@ function ytId(url){
   return m?m[1]:null;
 }
 
+function cleanTitle(title){
+  return (title||'')
+    .replace(/https?:\/\/[^\s<>"']+/g,'')  // strip URLs
+    .replace(/<[^>]+>/g,'')                    // strip HTML tags
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
 // ══════════════════════════════════════════
 // CHIPS
 // ══════════════════════════════════════════
@@ -1018,7 +1026,7 @@ function renderFeed(){
             ${posted?'<span class="badge posted-badge">✓ POSTED</span>':''}
             <span class="badge src">${a.source.name}</span>
           </div>
-          <div class="card-title">${a.title}</div>
+          <div class="card-title">${cleanTitle(a.title)}</div>
         </div>
       </div>
       <div class="card-body">
@@ -1062,7 +1070,7 @@ function selectArt(i){
   apBox.innerHTML=`${a.urlToImage?`<img class="ap-img" src="${a.urlToImage}" onerror="this.remove()" />`:''}
     <div class="ap-body">
       <div class="ap-src">${a.source.name.toUpperCase()} · ${timeAgo(a.publishedAt)}</div>
-      <div class="ap-title">${a.title}</div>
+      <div class="ap-title">${cleanTitle(a.title)}</div>
       <div class="ap-url">${a.url}</div>
     </div>`;
 
@@ -1117,7 +1125,7 @@ function selectArt(i){
 function buildCaption(a){
   const brk=isBreaking(a);
   const emoji=brk?'🚨':'📰';
-  return `${emoji} ${brk?'BREAKING: ':''}${a.title}\n\n${a.description||''}\n\n📍 ${a.source.name}  |  ${new Date(a.publishedAt).toUTCString().slice(0,22)}\n🔗 ${a.url}\n\n#BreakingNews #WorldNews ${brk?'#Breaking':''} #${a.source.name.replace(/\s+/g,'')}`;
+  return `${emoji} ${brk?'BREAKING: ':''}${cleanTitle(a.title)}\n\n${a.description||''}\n\n📍 ${a.source.name}  |  ${new Date(a.publishedAt).toUTCString().slice(0,22)}\n🔗 ${a.url}\n\n#BreakingNews #WorldNews ${brk?'#Breaking':''} #${a.source.name.replace(/\s+/g,'')}`;
 }
 
 // ══════════════════════════════════════════

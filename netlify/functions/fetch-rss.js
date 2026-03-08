@@ -256,7 +256,13 @@ function clean(text) {
   return (text || "")
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
-    .replace(/&#\d+;/g, "").trim();
+    .replace(/&#\d+;/g, "")
+    // Remove any raw URLs that leaked into title/text
+    .replace(/https?:\/\/[^\s<>"')]+/g, "")
+    // Remove leftover XML/HTML tags
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function normalizeDate(str) {
