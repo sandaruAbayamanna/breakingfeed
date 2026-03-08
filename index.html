@@ -540,6 +540,164 @@ select.inp{cursor:pointer;}
 .post-target-btn.selected{border-color:#1877f2;color:#1877f2;background:rgba(24,119,242,0.1);}
 .post-target-btn.selected.si-target{border-color:#D2691E;color:#D2691E;background:rgba(139,69,19,0.1);}
 
+
+/* ═══════════════════════════════════════════════════════
+   MOBILE RESPONSIVENESS — BreakingFeed PRO
+   3-column desktop → tabbed mobile interface
+═══════════════════════════════════════════════════════ */
+
+/* ── Mobile nav bar (hidden on desktop) ── */
+.mob-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 56px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 200;
+  grid-template-columns: repeat(3, 1fr);
+}
+.mob-nav-btn {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; border: none; background: transparent;
+  color: var(--muted); cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px; letter-spacing: 1px;
+  transition: color 0.15s; padding: 6px 0;
+}
+.mob-nav-btn .nav-icon { font-size: 18px; line-height: 1; }
+.mob-nav-btn.active { color: var(--red); }
+.mob-nav-btn.active .nav-icon { transform: scale(1.15); }
+
+/* ── Panel visibility on mobile ── */
+@media (max-width: 768px) {
+
+  /* Show mobile fetch bar */
+  #mobFetchBar { display: flex !important; }
+
+  /* Reset layout to single column */
+  .layout {
+    grid-template-columns: 1fr !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Header compact */
+  header {
+    padding: 8px 12px !important;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .hdr-title { font-size: 14px !important; }
+  .hdr-stats { gap: 6px !important; flex-wrap: wrap; }
+  .hdr-stat { padding: 4px 8px !important; }
+  .hdr-stat .n { font-size: 14px !important; }
+  .hdr-stat .l { font-size: 7px !important; }
+  #clock { font-size: 8px !important; }
+
+  /* All panels stack but only active one shows */
+  .sidebar, .feed-wrap, .rpanel {
+    display: none !important;
+    height: calc(100dvh - 56px - 48px) !important;
+    overflow-y: auto !important;
+    width: 100% !important;
+    position: relative !important;
+  }
+  .sidebar.mob-active,
+  .feed-wrap.mob-active,
+  .rpanel.mob-active {
+    display: flex !important;
+    flex-direction: column;
+  }
+
+  /* Show mobile nav */
+  .mob-nav { display: grid !important; }
+
+  /* Sidebar tweaks */
+  .sidebar { border-right: none !important; }
+  .sb-section { padding: 12px !important; }
+
+  /* Feed tweaks */
+  .feed-bar { padding: 8px 10px !important; flex-wrap: wrap; gap: 6px; }
+  .feed-tabs { flex-wrap: wrap; gap: 4px !important; }
+  .feed-grid { padding: 8px !important; }
+  .card { padding: 10px !important; }
+  .card-title { font-size: 11px !important; }
+
+  /* Composer tweaks */
+  .rpanel {
+    border-left: none !important;
+    border-top: 1px solid var(--border) !important;
+  }
+  .composer-inner { padding: 12px !important; }
+  .field-label { font-size: 8px !important; letter-spacing: 2px !important; }
+  .caption-box { font-size: 12px !important; min-height: 80px !important; }
+  .dual-caption { grid-template-columns: 1fr !important; }
+  .ptyp { font-size: 9px !important; padding: 6px 8px !important; }
+
+  /* FB mock preview — hide on mobile to save space */
+  .fb-mock { display: none !important; }
+
+  /* Post target row wraps */
+  .post-target-row { flex-wrap: wrap !important; }
+  .post-target-btn { min-width: calc(50% - 4px) !important; font-size: 9px !important; }
+
+  /* Lang toggle full width */
+  .lang-toggle-row { gap: 4px !important; }
+  .lang-btn { font-size: 9px !important; padding: 5px 6px !important; }
+
+  /* Modal full screen on mobile */
+  #fbModal > div {
+    width: 95vw !important;
+    max-height: 90dvh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Fetch/post buttons full width */
+  .sb-section > .btn { margin-top: 6px !important; }
+
+  /* Article preview panel inside composer */
+  .ap-box { margin-bottom: 8px !important; }
+  .ap-img { max-height: 120px !important; }
+
+  /* Video panel */
+  .mtab { font-size: 9px !important; padding: 5px 6px !important; }
+
+  /* Progress bar */
+  #progressWrap { bottom: 60px !important; }
+
+  /* Toast above nav */
+  .toast { bottom: 68px !important; }
+
+  /* Chips wrap */
+  .chips { flex-wrap: wrap !important; }
+
+  /* inp-row stays 2 cols but smaller */
+  .inp-row { gap: 4px !important; }
+  .inp { font-size: 11px !important; padding: 7px 9px !important; }
+  .btn { font-size: 10px !important; padding: 8px 10px !important; }
+
+  /* Account cards */
+  .fb-account-card { padding: 8px !important; }
+  .fb-acc-name { font-size: 10px !important; }
+}
+
+/* ── Tablet (768–1024px): 2 column layout ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .layout {
+    grid-template-columns: 230px 1fr !important;
+    grid-template-rows: 1fr 1fr;
+  }
+  .rpanel {
+    grid-column: 1 / -1 !important;
+    border-top: 1px solid var(--border);
+    border-left: none !important;
+    max-height: 380px;
+  }
+  .fb-mock { display: none !important; }
+}
+
 </style>
 </head>
 <body>
@@ -688,6 +846,11 @@ select.inp{cursor:pointer;}
 
   <!-- ═ FEED ═ -->
   <main class="feed-wrap">
+    <!-- Mobile fetch bar — only visible on mobile -->
+    <div id="mobFetchBar" style="display:none;padding:8px;background:var(--surface);border-bottom:1px solid var(--border);gap:6px;flex-wrap:wrap;">
+      <button class="btn btn-red" style="flex:1;min-width:120px;font-size:10px;padding:7px;" onclick="fetchNews()">⚡ FETCH NEWS</button>
+      <button class="btn btn-ghost" style="flex:1;min-width:120px;font-size:10px;padding:7px;" onclick="postAllBreaking()">🚨 POST BREAKING</button>
+    </div>
     <div class="feed-bar">
       <div class="feed-bar-title">GLOBAL FEED</div>
       <div class="filter-tabs">
@@ -2278,6 +2441,113 @@ function toggleAutoPost(btn){
   autoPostEnabled=btn.classList.contains('on');
   log(`Auto-post breaking: ${autoPostEnabled?'ON':'OFF'}`,autoPostEnabled?'warn':'inf');
 }
+
+// ══════════════════════════════════════════
+// MOBILE NAV — Panel switcher
+// ══════════════════════════════════════════
+let mobActivePanel = 'feed';
+
+function mobSwitch(panel) {
+  if (window.innerWidth > 768) return; // desktop: do nothing
+
+  mobActivePanel = panel;
+
+  // Map panel names to element classes and nav button IDs
+  const panels = {
+    settings: { el: document.querySelector('.sidebar'),   btn: 'mobBtnSettings' },
+    feed:     { el: document.querySelector('.feed-wrap'), btn: 'mobBtnFeed' },
+    compose:  { el: document.querySelector('.rpanel'),    btn: 'mobBtnCompose' },
+  };
+
+  // Toggle panels
+  Object.entries(panels).forEach(([name, { el, btn }]) => {
+    if (!el) return;
+    if (name === panel) {
+      el.classList.add('mob-active');
+    } else {
+      el.classList.remove('mob-active');
+    }
+    // Update nav button active state
+    const b = document.getElementById(btn);
+    if (b) b.classList.toggle('active', name === panel);
+  });
+
+  // When switching to compose, scroll to top of panel
+  if (panel === 'compose') {
+    const rp = document.querySelector('.rpanel');
+    if (rp) rp.scrollTop = 0;
+  }
+}
+
+// Auto-switch to compose panel when article is selected on mobile
+const _origSelectArt = typeof selectArt === 'function' ? selectArt : null;
+function selectArtMobile(i) {
+  if (_origSelectArt) _origSelectArt.call(this, i);
+  // On mobile, auto-navigate to compose panel after selecting article
+  if (window.innerWidth <= 768) {
+    setTimeout(() => mobSwitch('compose'), 80);
+  }
+}
+
+// Patch selectArt calls to use mobile version
+document.addEventListener('DOMContentLoaded', () => {
+  // Init mobile on load
+  if (window.innerWidth <= 768) {
+    mobSwitch('feed');
+  }
+
+  // Add badge to compose button when article is selected
+  const origSelectArt = window.selectArt;
+  if (origSelectArt) {
+    window.selectArt = function(i) {
+      origSelectArt(i);
+      if (window.innerWidth <= 768) {
+        setTimeout(() => mobSwitch('compose'), 80);
+        // Show badge on POST button
+        const btn = document.getElementById('mobBtnCompose');
+        if (btn) {
+          btn.querySelector('.nav-icon').textContent = '✅';
+          setTimeout(() => {
+            btn.querySelector('.nav-icon').textContent = '📤';
+          }, 3000);
+        }
+      }
+    };
+  }
+});
+
+// Handle resize — reset on desktop
+window.addEventListener('resize', () => {
+  const sidebar  = document.querySelector('.sidebar');
+  const feed     = document.querySelector('.feed-wrap');
+  const rpanel   = document.querySelector('.rpanel');
+  if (window.innerWidth > 768) {
+    // Restore all panels visible on desktop
+    [sidebar, feed, rpanel].forEach(el => {
+      if (el) el.classList.remove('mob-active');
+    });
+  } else {
+    // Re-apply mobile active panel
+    mobSwitch(mobActivePanel);
+  }
+});
+
 </script>
+<!-- ═ MOBILE NAV ═ -->
+<nav class="mob-nav" id="mobNav">
+  <button class="mob-nav-btn" id="mobBtnSettings" onclick="mobSwitch('settings')">
+    <span class="nav-icon">⚙️</span>
+    <span>SETTINGS</span>
+  </button>
+  <button class="mob-nav-btn active" id="mobBtnFeed" onclick="mobSwitch('feed')">
+    <span class="nav-icon">📡</span>
+    <span>FEED</span>
+  </button>
+  <button class="mob-nav-btn" id="mobBtnCompose" onclick="mobSwitch('compose')">
+    <span class="nav-icon">📤</span>
+    <span>POST</span>
+  </button>
+</nav>
+
 </body>
 </html>
