@@ -1920,9 +1920,22 @@ async function postToFB(articleIdx, caption){
   // ── TEXT + LINK POST (default) ──
   try{
     const body={pageId:fbPageId,message:cap,link:a.url,access_token:fbToken};
+    log(`Sending to FB: pageId=${fbPageId}, link=${a.url.slice(0,40)}…`,'inf');
     const res=await fetch(`/api/fb/post`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const data=await res.json();
-    if(data.error)throw new Error(data.error.message);
+    // Log full raw response so we can debug
+    log(`FB raw response: ${JSON.stringify(data)}`,'inf');
+    if(data.error){
+      const errMsg = typeof data.error === 'string' ? data.error
+        : data.error.message || data.error.error_user_msg || JSON.stringify(data.error);
+      throw new Error(errMsg);
+    }
+    if(!data.id){
+      // No error but also no ID — something is wrong
+      log(`⚠ FB returned no post ID. Full response: ${JSON.stringify(data)}`,'err');
+      throw new Error('Facebook returned no post ID — check Netlify function logs');
+    }
+    log(`✓ Posted! FB post ID: ${data.id}`,'ok');
     markPosted(a, data.id, articleIdx);
     return true;
   }catch(err){
