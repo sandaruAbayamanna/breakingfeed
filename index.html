@@ -1041,7 +1041,8 @@ function closeFbModal() {
 function saveAccount() {
   const name   = document.getElementById('maName').value.trim();
   const pageId = document.getElementById('maPageId').value.trim();
-  const token  = document.getElementById('maToken').value.trim();
+  // Strip ALL whitespace from token — copy-paste often adds spaces/newlines
+  const token  = document.getElementById('maToken').value.replace(/\s+/g, '');
   const lang   = document.getElementById('maLang').value;
 
   if (!name)   { toast('Enter a page name', 'err'); return; }
@@ -1994,8 +1995,11 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
   if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
   const fbToken  = activeAcc.token.trim();
   const fbPageId = activeAcc.pageId.trim();
-  log(`Video post using account: ${activeAcc.name}, pageId: ${fbPageId}, token tail: …${fbToken.slice(-8)}`, 'inf');
+  log(`Video post using account: ${activeAcc.name}, pageId: ${fbPageId}, token length: ${fbToken.length}, tail: …${fbToken.slice(-8)}`, 'inf');
   if(!fbToken || !fbPageId){ toast('Facebook page token or ID is empty — re-add the page','err'); return false; }
+  // Sanitize token — remove any whitespace or newlines that may have crept in
+  const cleanToken = fbToken.replace(/\s+/g, '');
+  if(cleanToken.length !== fbToken.length) log(`⚠ Token had whitespace stripped (${fbToken.length} → ${cleanToken.length} chars)`, 'inf');
   const a=articles[articleIdx];
 
   // Determine the video URL to use
@@ -2045,7 +2049,7 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
     if(isYT || isVim){
       log('Posting YouTube/Vimeo as embedded link…', 'inf');
       showProgress(40, 'Posting to Facebook…');
-      const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken };
+      const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:cleanToken };
       const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       const data = await res.json();
       log(`FB response: ${JSON.stringify(data)}`, 'inf');
@@ -2064,7 +2068,7 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
 
       const body = {
         pageId: fbPageId,
-        access_token: fbToken,
+        access_token: cleanToken,
         description: cap,
         title: cleanTitle(a.title).slice(0,80),
         file_url: videoUrl
@@ -2097,7 +2101,7 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
             pageId: fbPageId,
             message: cap + '\n\n🎬 Watch: ' + videoUrl,
             link: a.url,
-            access_token: fbToken
+            access_token: cleanToken
           };
           const fallRes = await fetch('/api/fb/post', {
             method: 'POST',
@@ -2142,7 +2146,7 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
       pageId: fbPageId,
       message: videoCaption,
       link: linkUrl,
-      access_token: fbToken
+      access_token: cleanToken
     };
     const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const data = await res.json();
