@@ -1099,9 +1099,14 @@ async function postToAllTargets(articleIdx) {
     try {
       log(`Posting to: ${acc.name} (${acc.lang?.toUpperCase()||'EN'})…`, 'inf');
 
-      // Set credentials for this account
+      // Set activeAccountId so postToFB/postVideoToFB reads the right credentials
+      activeAccountId = acc.id;
+
+      // Also sync hidden inputs for any legacy code paths
       document.getElementById('fbToken').value = acc.token;
       document.getElementById('fbPageId').value = acc.pageId;
+
+      log(`Token tail: …${acc.token.slice(-8)}, PageID: ${acc.pageId}`, 'inf');
 
       // Set language for this account
       const langBtn = document.getElementById(
@@ -1989,7 +1994,8 @@ async function postVideoToFB(articleIdx, cap) {
   if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
   const fbToken  = activeAcc.token.trim();
   const fbPageId = activeAcc.pageId.trim();
-  if(!fbToken || !fbPageId){ toast('Facebook page token or ID is empty','err'); return false; }
+  log(`Video post using account: ${activeAcc.name}, pageId: ${fbPageId}, token tail: …${fbToken.slice(-8)}`, 'inf');
+  if(!fbToken || !fbPageId){ toast('Facebook page token or ID is empty — re-add the page','err'); return false; }
   const a=articles[articleIdx];
 
   // Determine the video URL to use
