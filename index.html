@@ -1986,46 +1986,109 @@ async function postVideoToFB(articleIdx, cap) {
     videoLabel = videoUrl;
   }
 
-  // ── SMART VIDEO POSTING ──
-  // Facebook /videos endpoint requires special App Review permissions.
-  // Instead we post via /feed as a link post — Facebook auto-embeds
-  // MP4 and YouTube/Vimeo links as playable video inside the post.
-  // This only needs pages_manage_posts which we already have. ✅
+  const isYT  = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
+  const isVim = videoUrl.includes('vimeo.com');
+  const isDirect = videoUrl.match(/\.(mp4|webm|mov|m3u8)(\?|$)/i);
 
-  log(`Posting video as link post: ${videoLabel.slice(0,40)}…`, 'inf');
-  showProgress(20, 'Posting video to Facebook…');
+  log(`Video type: ${isYT?'YouTube':isVim?'Vimeo':isDirect?'Direct MP4':'Link'} — ${videoLabel.slice(0,50)}…`, 'inf');
+  showProgress(15, 'Preparing video post…');
 
   try{
-    // Build caption — append video URL so Facebook scrapes and embeds it
-    const isYT  = videoUrl.includes('youtube') || videoUrl.includes('youtu.be');
-    const isVim = videoUrl.includes('vimeo.com');
-    const isMp4 = videoUrl.match(/\.mp4/i);
 
-    // For YouTube/Vimeo use the video URL as the link (FB embeds it natively)
-    // For direct MP4 include URL in message so FB scrapes the video
-    const linkToPost = (isYT || isVim) ? videoUrl : a.url;
-    const fullCaption = isMp4
-      ? `${cap}
+    // ── CASE 1: YouTube / Vimeo ──
+    // Post the video URL as the link — Facebook natively embeds it as playable video
+    if(isYT || isVim){
+      log('Posting YouTube/Vimeo as embedded link…', 'inf');
+      showProgress(40, 'Posting to Facebook…');
+      const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken };
+      const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+      const data = await res.json();
+      if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+      showProgress(100, '✓ Video posted!');
+      setTimeout(hideProgress, 2000);
+      markPosted(a, data.id, articleIdx);
+      return true;
+    }
 
-🎬 Video: ${videoUrl}`
-      : cap;
+    // ── CASE 2: Direct MP4/video file URL ──
+    // Server downloads the video binary and uploads it directly to Facebook
+    if(isDirect){
+      log('📥 Downloading video server-side then uploading to Facebook…', 'inf');
+      showProgress(20, '📥 Downloading video… (may take 10–30s for large files)');
 
-    const body = {
-      pageId: fbPageId,
-      message: fullCaption,
-      link: linkToPost,
-      access_token: fbToken
-    };
+      const body = {
+        pageId: fbPageId,
+        access_token: fbToken,
+        description: cap,
+        title: cleanTitle(a.title).slice(0,80),
+        file_url: videoUrl
+      };
 
-    const res = await fetch('/api/fb/post', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body)
-    });
+      // Animate progress while waiting (download + upload can take 30–90s)
+      let fakePct = 20;
+      const progressTimer = setInterval(() => {
+        if(fakePct < 85) {
+          fakePct += (fakePct < 50 ? 3 : fakePct < 70 ? 1.5 : 0.5);
+          const stage = fakePct < 45 ? '📥 Downloading video…' : fakePct < 75 ? '📤 Uploading to Facebook…' : '⏳ Finalizing…';
+          showProgress(Math.round(fakePct), stage);
+        }
+      }, 1200);
+
+      try {
+        const res = await fetch('/api/fb/video', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        clearInterval(progressTimer);
+
+        if(data.error) {
+          // Fallback: post as text+link with video URL in caption
+          log(`⚠ Direct upload failed (${data.error.message}) — falling back to link post`, 'inf');
+          showProgress(90, 'Trying fallback post…');
+          const fallbackBody = {
+            pageId: fbPageId,
+            message: cap + '\n\n🎬 Watch: ' + videoUrl,
+            link: a.url,
+            access_token: fbToken
+          };
+          const fallRes = await fetch('/api/fb/post', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(fallbackBody)
+          });
+          const fallData = await fallRes.json();
+          if(fallData.error) throw new Error(fallData.error.message);
+          showProgress(100, '✓ Posted with video link in caption');
+          setTimeout(hideProgress, 2000);
+          markPosted(a, fallData.id, articleIdx);
+          toast('Posted! (Video URL added to caption — direct upload needs App Review)', 'ok');
+          return true;
+        }
+
+        const sizeTxt = data.fileSizeMB ? ` (${data.fileSizeMB}MB)` : '';
+        showProgress(100, `✓ Video uploaded to Facebook${sizeTxt}!`);
+        setTimeout(hideProgress, 3000);
+        markPosted(a, data.id || data.video_id, articleIdx);
+        log(`✓ Video uploaded to Facebook${sizeTxt}`, 'ok');
+        return true;
+
+      } catch(uploadErr) {
+        clearInterval(progressTimer);
+        throw uploadErr;
+      }
+    }
+
+    // ── CASE 3: Any other URL (news site video page, etc.) ──
+    // Post as article link — Facebook will show OG preview with play button if the page has video OG tags
+    log('Posting video page as article link…', 'inf');
+    showProgress(40, 'Posting article link…');
+    const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken };
+    const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const data = await res.json();
-    if(data.error) throw new Error(data.error.message);
-
-    showProgress(100, 'Video posted!');
+    if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+    showProgress(100, '✓ Posted!');
     setTimeout(hideProgress, 2000);
     markPosted(a, data.id, articleIdx);
     return true;
