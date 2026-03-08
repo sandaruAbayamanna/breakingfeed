@@ -497,49 +497,6 @@ select.inp{cursor:pointer;}
 .dual-label.si{color:#D2691E;}
 .dual-label.en{color:var(--blue-fb);}
 
-
-/* ── Multi-account FB manager ── */
-.fb-account-card{
-  background:var(--card2);border:1px solid var(--border2);
-  border-radius:6px;padding:8px 10px;cursor:pointer;
-  transition:all 0.15s;position:relative;
-}
-.fb-account-card:hover{border-color:var(--border3);}
-.fb-account-card.active{
-  border-color:#1877f2;
-  background:rgba(24,119,242,0.08);
-}
-.fb-account-card.active-si{
-  border-color:#D2691E;
-  background:rgba(139,69,19,0.08);
-}
-.fb-acc-name{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:var(--text);margin-bottom:2px;}
-.fb-acc-meta{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);display:flex;gap:6px;align-items:center;}
-.fb-acc-lang{padding:1px 5px;border-radius:3px;font-size:8px;letter-spacing:1px;}
-.fb-acc-lang.en{background:rgba(24,119,242,0.2);color:#1877f2;}
-.fb-acc-lang.si{background:rgba(139,69,19,0.2);color:#D2691E;}
-.fb-acc-lang.both{background:rgba(100,200,100,0.15);color:#4caf50;}
-.fb-acc-edit{position:absolute;top:6px;right:8px;font-size:10px;opacity:0.4;cursor:pointer;}
-.fb-acc-edit:hover{opacity:1;}
-.fb-acc-active-dot{
-  width:6px;height:6px;border-radius:50%;
-  background:#1877f2;display:inline-block;margin-right:4px;
-  animation:blink 1.5s ease-in-out infinite;
-}
-.fb-acc-active-dot.si{background:#D2691E;}
-.post-target-row{
-  display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;
-}
-.post-target-btn{
-  flex:1;min-width:80px;padding:5px 8px;font-size:9px;
-  font-family:'JetBrains Mono',monospace;letter-spacing:1px;
-  border:1px solid var(--border2);background:var(--card2);
-  color:var(--muted);border-radius:4px;cursor:pointer;
-  transition:all 0.15s;text-align:center;
-}
-.post-target-btn.selected{border-color:#1877f2;color:#1877f2;background:rgba(24,119,242,0.1);}
-.post-target-btn.selected.si-target{border-color:#D2691E;color:#D2691E;background:rgba(139,69,19,0.1);}
-
 </style>
 </head>
 <body>
@@ -582,44 +539,11 @@ select.inp{cursor:pointer;}
       <div id="apiHint" style="font-size:10px;color:var(--green);font-family:'JetBrains Mono',monospace;margin-top:-4px;margin-bottom:6px;line-height:1.5;"></div>
     </div>
 
-    <div class="sb-section" id="fbAccountsSection">
-      <div class="sb-label" style="display:flex;align-items:center;justify-content:space-between;">
-        <span>Facebook Pages</span>
-        <button class="btn btn-ghost" style="padding:2px 8px;font-size:9px;" onclick="openAddAccount()">+ ADD PAGE</button>
-      </div>
-
-      <!-- Account list -->
-      <div id="fbAccountList" style="display:flex;flex-direction:column;gap:5px;"></div>
-
-      <!-- Active account indicator -->
-      <div id="fbActiveIndicator" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-top:4px;"></div>
-
-      <!-- Hidden inputs kept for compatibility with existing post functions -->
-      <input type="hidden" id="fbToken" />
-      <input type="hidden" id="fbPageId" />
-    </div>
-
-    <!-- Add/Edit Account Modal -->
-    <div id="fbModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;align-items:center;justify-content:center;">
-      <div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:20px;width:340px;max-width:95vw;">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--text);margin-bottom:14px;" id="fbModalTitle">ADD FACEBOOK PAGE</div>
-        <input class="inp" type="text" id="maName" placeholder="Page display name (e.g. Hidden Voices Studio)" style="margin-bottom:6px;" />
-        <input class="inp" type="text" id="maPageId" placeholder="Facebook Page ID" style="margin-bottom:6px;" />
-        <input class="inp" type="password" id="maToken" placeholder="Page Access Token" style="margin-bottom:6px;" />
-        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:12px;">
-          Default language for this page:
-        </div>
-        <select class="inp" id="maLang" style="margin-bottom:14px;">
-          <option value="en">🇬🇧 English</option>
-          <option value="si">🇱🇰 සිංහල (Sinhala)</option>
-          <option value="both">🌐 Both (English + Sinhala)</option>
-        </select>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-red" style="flex:1;" onclick="saveAccount()">SAVE PAGE</button>
-          <button class="btn btn-ghost" style="flex:1;" onclick="closeFbModal()">CANCEL</button>
-        </div>
-        <button id="maDeleteBtn" class="btn" style="width:100%;margin-top:8px;background:#1a0a0a;color:var(--red);border:1px solid var(--red);display:none;" onclick="deleteAccount()">DELETE THIS PAGE</button>
-      </div>
+    <div class="sb-section">
+      <div class="sb-label">Facebook</div>
+      <input class="inp" type="password" id="fbToken" placeholder="Facebook Page Access Token…" />
+      <input class="inp" type="text" id="fbPageId" placeholder="Facebook Page ID" />
+      <input class="inp" type="text" id="fbPageName" placeholder="Page display name (optional)" />
     </div>
 
     <div class="sb-section">
@@ -763,14 +687,6 @@ select.inp{cursor:pointer;}
           <button class="btn btn-amber" onclick="aiCaption()" id="aiBtn" style="flex:1;">✨ AI Caption</button>
           <button class="btn btn-sinhala" onclick="translateToSinhala()" id="siBtn" style="flex:1;">🇱🇰 Translate සිංහල</button>
         </div>
-
-        <!-- Post target accounts -->
-        <div style="margin-top:10px;">
-          <div class="field-label" style="margin-bottom:5px;">POST TO PAGE(S)</div>
-          <div class="post-target-row" id="postTargetRow">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);">No pages added — add via sidebar</div>
-          </div>
-        </div>
       </div>
 
       <div>
@@ -857,7 +773,7 @@ select.inp{cursor:pointer;}
       </div>
 
       <div class="post-btns">
-        <button class="btn btn-blue" id="postNowBtn" onclick="postToAllTargets()">📘 POST TO FACEBOOK NOW</button>
+        <button class="btn btn-blue" id="postNowBtn" onclick="postNow()">📘 POST TO FACEBOOK NOW</button>
         <button class="btn btn-ghost" onclick="copyAndOpen()">📋 COPY + OPEN FACEBOOK</button>
         <div class="sched-row">
           <input class="inp" type="datetime-local" id="schedTime" />
@@ -890,267 +806,6 @@ let autoRefreshTimer = null;
 let autoPostEnabled = false;
 let postQueue = [];
 let currentTab = 'all';
-
-// ══════════════════════════════════════════
-// MULTI-ACCOUNT FACEBOOK MANAGER
-// ══════════════════════════════════════════
-let fbAccounts = JSON.parse(localStorage.getItem('fbAccounts') || '[]');
-let activeAccountId = localStorage.getItem('fbActiveAccount') || null;
-let editingAccountId = null;
-let selectedTargetIds = []; // which accounts to post to
-
-function saveFbAccounts() {
-  localStorage.setItem('fbAccounts', JSON.stringify(fbAccounts));
-  localStorage.setItem('fbActiveAccount', activeAccountId || '');
-}
-
-function genId() {
-  return 'acc_' + Math.random().toString(36).slice(2, 9);
-}
-
-// ── Render account cards in sidebar ──
-function renderAccountList() {
-  const list = document.getElementById('fbAccountList');
-  const indicator = document.getElementById('fbActiveIndicator');
-  if (!list) return;
-
-  if (!fbAccounts.length) {
-    list.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--muted2);text-align:center;padding:8px 0;">No pages added yet</div>';
-    indicator.innerHTML = '';
-    updatePostTargetRow();
-    syncActiveAccount();
-    return;
-  }
-
-  list.innerHTML = fbAccounts.map(acc => {
-    const isActive = acc.id === activeAccountId;
-    const langLabel = acc.lang === 'si' ? 'සිංහල' : acc.lang === 'both' ? 'EN+SI' : 'EN';
-    const langClass = acc.lang || 'en';
-    return `
-      <div class="fb-account-card ${isActive ? (acc.lang==='si'?'active-si':'active') : ''}"
-           onclick="setActiveAccount('${acc.id}')">
-        <div class="fb-acc-name">${acc.name || 'Unnamed Page'}</div>
-        <div class="fb-acc-meta">
-          ${isActive ? '<span class="fb-acc-active-dot ' + (acc.lang==='si'?'si':'') + '"></span>ACTIVE' : ''}
-          <span class="fb-acc-lang ${langClass}">${langLabel}</span>
-          <span style="opacity:0.5;">${acc.pageId ? acc.pageId.slice(-6) : '------'}</span>
-        </div>
-        <span class="fb-acc-edit" onclick="event.stopPropagation();openEditAccount('${acc.id}')">✎</span>
-      </div>`;
-  }).join('');
-
-  const active = fbAccounts.find(a => a.id === activeAccountId);
-  indicator.innerHTML = active
-    ? `<span class="fb-acc-active-dot ${active.lang==='si'?'si':''}"></span>Posting as: <b>${active.name}</b>`
-    : '';
-
-  updatePostTargetRow();
-  syncActiveAccount();
-}
-
-// ── Sync hidden inputs for backwards compat ──
-function syncActiveAccount() {
-  const acc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
-  if (acc) {
-    document.getElementById('fbToken').value = acc.token || '';
-    document.getElementById('fbPageId').value = acc.pageId || '';
-    // Also set language mode to match account default
-    const langBtn = document.getElementById(
-      acc.lang === 'si' ? 'langSi' : acc.lang === 'both' ? 'langBoth' : 'langEn'
-    );
-    if (langBtn) setLang(acc.lang || 'en', langBtn);
-  }
-}
-
-function setActiveAccount(id) {
-  activeAccountId = id;
-  saveFbAccounts();
-  renderAccountList();
-  const acc = fbAccounts.find(a => a.id === id);
-  if (acc) toast(`Active: ${acc.name}`, 'ok');
-}
-
-// ── Post target row in composer ──
-function updatePostTargetRow() {
-  const row = document.getElementById('postTargetRow');
-  if (!row) return;
-
-  if (!fbAccounts.length) {
-    row.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--muted2);">No pages added — add via sidebar ↑</div>';
-    return;
-  }
-
-  // Default: select active account
-  if (!selectedTargetIds.length && activeAccountId) {
-    selectedTargetIds = [activeAccountId];
-  }
-
-  row.innerHTML = fbAccounts.map(acc => {
-    const sel = selectedTargetIds.includes(acc.id);
-    const isSi = acc.lang === 'si';
-    return `<button class="post-target-btn ${sel ? 'selected' + (isSi?' si-target':'') : ''}"
-      onclick="toggleTarget('${acc.id}',this)">
-      ${acc.lang==='si'?'🇱🇰':acc.lang==='both'?'🌐':'🇬🇧'} ${acc.name || 'Page'}
-    </button>`;
-  }).join('');
-}
-
-function toggleTarget(id, btn) {
-  if (selectedTargetIds.includes(id)) {
-    if (selectedTargetIds.length === 1) return; // keep at least one
-    selectedTargetIds = selectedTargetIds.filter(x => x !== id);
-    btn.classList.remove('selected', 'si-target');
-  } else {
-    selectedTargetIds.push(id);
-    const acc = fbAccounts.find(a => a.id === id);
-    btn.classList.add('selected');
-    if (acc?.lang === 'si') btn.classList.add('si-target');
-  }
-}
-
-// ── Modal: Add account ──
-function openAddAccount() {
-  editingAccountId = null;
-  document.getElementById('fbModalTitle').textContent = 'ADD FACEBOOK PAGE';
-  document.getElementById('maName').value = '';
-  document.getElementById('maPageId').value = '';
-  document.getElementById('maToken').value = '';
-  document.getElementById('maLang').value = 'en';
-  document.getElementById('maDeleteBtn').style.display = 'none';
-  document.getElementById('fbModal').style.display = 'flex';
-}
-
-function openEditAccount(id) {
-  const acc = fbAccounts.find(a => a.id === id);
-  if (!acc) return;
-  editingAccountId = id;
-  document.getElementById('fbModalTitle').textContent = 'EDIT PAGE';
-  document.getElementById('maName').value = acc.name || '';
-  document.getElementById('maPageId').value = acc.pageId || '';
-  document.getElementById('maToken').value = acc.token || '';
-  document.getElementById('maLang').value = acc.lang || 'en';
-  document.getElementById('maDeleteBtn').style.display = 'block';
-  document.getElementById('fbModal').style.display = 'flex';
-}
-
-function closeFbModal() {
-  document.getElementById('fbModal').style.display = 'none';
-  editingAccountId = null;
-}
-
-function saveAccount() {
-  const name   = document.getElementById('maName').value.trim();
-  const pageId = document.getElementById('maPageId').value.trim();
-  // Strip ALL whitespace from token — copy-paste often adds spaces/newlines
-  const token  = document.getElementById('maToken').value.replace(/\s+/g, '');
-  const lang   = document.getElementById('maLang').value;
-
-  if (!name)   { toast('Enter a page name', 'err'); return; }
-  if (!pageId) { toast('Enter the Page ID', 'err'); return; }
-  if (!token)  { toast('Enter the Access Token', 'err'); return; }
-
-  if (editingAccountId) {
-    const idx = fbAccounts.findIndex(a => a.id === editingAccountId);
-    if (idx >= 0) fbAccounts[idx] = { ...fbAccounts[idx], name, pageId, token, lang };
-    toast(`Updated: ${name}`, 'ok');
-  } else {
-    const newAcc = { id: genId(), name, pageId, token, lang };
-    fbAccounts.push(newAcc);
-    if (!activeAccountId) activeAccountId = newAcc.id;
-    if (!selectedTargetIds.length) selectedTargetIds = [newAcc.id];
-    toast(`Added: ${name}`, 'ok');
-  }
-
-  saveFbAccounts();
-  closeFbModal();
-  renderAccountList();
-  log(`FB page saved: ${name} (${lang.toUpperCase()})`, 'ok');
-}
-
-function deleteAccount() {
-  if (!editingAccountId) return;
-  const acc = fbAccounts.find(a => a.id === editingAccountId);
-  fbAccounts = fbAccounts.filter(a => a.id !== editingAccountId);
-  if (activeAccountId === editingAccountId) activeAccountId = fbAccounts[0]?.id || null;
-  selectedTargetIds = selectedTargetIds.filter(x => x !== editingAccountId);
-  saveFbAccounts();
-  closeFbModal();
-  renderAccountList();
-  toast(`Deleted: ${acc?.name}`, 'ok');
-}
-
-// Close modal on backdrop click
-document.addEventListener('click', e => {
-  const modal = document.getElementById('fbModal');
-  if (modal && e.target === modal) closeFbModal();
-});
-
-// ── Override postNow to post to ALL selected accounts ──
-async function postToAllTargets(articleIdx) {
-  if (!fbAccounts.length) { toast('Add a Facebook page first', 'err'); return; }
-
-  const targets = selectedTargetIds.length
-    ? fbAccounts.filter(a => selectedTargetIds.includes(a.id))
-    : [fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0]];
-
-  if (!targets.length) { toast('Select at least one target page', 'err'); return; }
-
-  let successCount = 0;
-  for (const acc of targets) {
-    try {
-      log(`Posting to: ${acc.name} (${acc.lang?.toUpperCase()||'EN'})…`, 'inf');
-
-      // Set activeAccountId so postToFB/postVideoToFB reads the right credentials
-      activeAccountId = acc.id;
-
-      // Also sync hidden inputs for any legacy code paths
-      document.getElementById('fbToken').value = acc.token;
-      document.getElementById('fbPageId').value = acc.pageId;
-
-      log(`Token tail: …${acc.token.slice(-8)}, PageID: ${acc.pageId}`, 'inf');
-
-      // Set language for this account
-      const langBtn = document.getElementById(
-        acc.lang === 'si' ? 'langSi' : acc.lang === 'both' ? 'langBoth' : 'langEn'
-      );
-      if (langBtn) setLang(acc.lang || 'en', langBtn);
-
-      // Auto-translate if account is Sinhala and caption is in English
-      if (acc.lang === 'si') {
-        const englishCap = document.getElementById('captionBox').value.trim();
-        if (englishCap && !isSinhala(englishCap)) {
-          log(`Auto-translating to Sinhala for ${acc.name}…`, 'inf');
-          await translateToSinhala();
-        }
-      }
-
-      // Post — pass account directly so credentials never get lost
-      const ok = await postToFB(articleIdx !== undefined ? articleIdx : selIdx, null, acc);
-      if (ok !== false) {
-        successCount++;
-        log(`✓ Posted to ${acc.name}`, 'ok');
-      }
-    } catch(err) {
-      log(`✗ Failed for ${acc.name}: ${err.message}`, 'err');
-    }
-    // Small delay between multiple accounts
-    if (targets.length > 1) await new Promise(r => setTimeout(r, 1500));
-  }
-
-  toast(`Posted to ${successCount}/${targets.length} pages`, successCount > 0 ? 'ok' : 'err');
-  // Restore active account
-  syncActiveAccount();
-}
-
-// Detect if text contains Sinhala characters
-function isSinhala(text) {
-  return /[඀-෿]/.test(text);
-}
-
-// Init on load
-document.addEventListener('DOMContentLoaded', () => {
-  renderAccountList();
-});
 
 const BRK = ['breaking','urgent','killed','attack','strike','explosion','invasion','offensive','ceasefire violation','airstrike','missile','bombardment','troops','combat','battle','evacuation order','casualties'];
 const TOP_SRCS = ['Reuters','BBC','Associated Press','AP','Al Jazeera','CNN','The Guardian','Bloomberg','NYT','New York Times'];
@@ -1862,14 +1517,11 @@ async function aiCaption(articleIdx){
 
 // ══════════════════════════════════════════
 // POST TO FACEBOOK
-async function postToFB(articleIdx, caption, injectedAcc){
-  // Use injected account if provided, otherwise fall back to active account
-  const activeAcc = injectedAcc || fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
-  if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
-  const fbToken  = activeAcc.token.trim();
-  const fbPageId = activeAcc.pageId.trim();
+async function postToFB(articleIdx, caption){
+  const fbToken=document.getElementById('fbToken').value.trim();
+  const fbPageId=document.getElementById('fbPageId').value.trim();
   if(!fbToken||!fbPageId){
-    toast('Facebook page token or ID is missing — check your page settings','err');
+    toast('Enter Facebook Page Token & Page ID','err');
     log('Missing Facebook credentials','err');
     return false;
   }
@@ -1896,7 +1548,7 @@ async function postToFB(articleIdx, caption, injectedAcc){
 
   // ── VIDEO POST ──
   if(postType==='video'){
-    return await postVideoToFB(articleIdx, cap, activeAcc);
+    return await postVideoToFB(articleIdx, cap);
   }
 
   // ── IMAGE POST ──
@@ -1929,22 +1581,9 @@ async function postToFB(articleIdx, caption, injectedAcc){
   // ── TEXT + LINK POST (default) ──
   try{
     const body={pageId:fbPageId,message:cap,link:a.url,access_token:fbToken};
-    log(`Sending to FB: pageId=${fbPageId}, link=${a.url.slice(0,40)}…`,'inf');
     const res=await fetch(`/api/fb/post`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const data=await res.json();
-    // Log full raw response so we can debug
-    log(`FB raw response: ${JSON.stringify(data)}`,'inf');
-    if(data.error){
-      const errMsg = typeof data.error === 'string' ? data.error
-        : data.error.message || data.error.error_user_msg || JSON.stringify(data.error);
-      throw new Error(errMsg);
-    }
-    if(!data.id){
-      // No error but also no ID — something is wrong
-      log(`⚠ FB returned no post ID. Full response: ${JSON.stringify(data)}`,'err');
-      throw new Error('Facebook returned no post ID — check Netlify function logs');
-    }
-    log(`✓ Posted! FB post ID: ${data.id}`,'ok');
+    if(data.error)throw new Error(data.error.message);
     markPosted(a, data.id, articleIdx);
     return true;
   }catch(err){
@@ -1956,7 +1595,7 @@ async function postToFB(articleIdx, caption, injectedAcc){
 }
 
 
-async function postNow(articleIdx, skipTokenCheck=false){
+async function postNow(){
   if(selIdx===null){toast('Select an article first','err');return;}
   await postToFB(selIdx);
 }
@@ -1989,172 +1628,67 @@ function copyAndOpen(){
 // ══════════════════════════════════════════
 // VIDEO UPLOAD TO FACEBOOK
 // ══════════════════════════════════════════
-async function postVideoToFB(articleIdx, cap, injectedAcc) {
-  // Use injected account if provided, otherwise fall back to active account
-  const activeAcc = injectedAcc || fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
-  if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
-  const fbToken  = activeAcc.token.trim();
-  const fbPageId = activeAcc.pageId.trim();
-  log(`Video post using account: ${activeAcc.name}, pageId: ${fbPageId}, token length: ${fbToken.length}, tail: …${fbToken.slice(-8)}`, 'inf');
-  if(!fbToken || !fbPageId){ toast('Facebook page token or ID is empty — re-add the page','err'); return false; }
-  // Sanitize token — remove any whitespace or newlines that may have crept in
-  const cleanToken = fbToken.replace(/\s+/g, '');
-  if(cleanToken.length !== fbToken.length) log(`⚠ Token had whitespace stripped (${fbToken.length} → ${cleanToken.length} chars)`, 'inf');
+async function postVideoToFB(articleIdx, cap) {
+  const fbToken=document.getElementById('fbToken').value.trim();
+  const fbPageId=document.getElementById('fbPageId').value.trim();
   const a=articles[articleIdx];
 
   // Determine the video URL to use
-  // ⚠ Capture IMMEDIATELY — selectArt() or lang switching may clear these fields
   let videoUrl = '';
   let videoLabel = '';
 
-  // Snapshot current values before anything can wipe them
-  const snapExtracted = selectedExtractedVideo;
-  const snapUrlInput  = document.getElementById('videoUrl')?.value?.trim() || '';
-  const snapTab       = currentVideoTab;
-
-  log(`Video tab: "${snapTab}", extractedVideo: ${snapExtracted?snapExtracted.url.slice(0,40):'null'}, urlInput: "${snapUrlInput.slice(0,40)}"`, 'inf');
-
-  // Priority: if an extracted video is selected, always use it regardless of active tab
-  if(snapExtracted) {
-    videoUrl   = snapExtracted.url;
-    videoLabel = snapExtracted.label || snapExtracted.url;
-    log(`Using extracted video: ${videoUrl.slice(0,60)}`, 'inf');
-  } else if(snapUrlInput) {
-    videoUrl   = snapUrlInput;
-    videoLabel = snapUrlInput;
-    log(`Using pasted URL: ${videoUrl.slice(0,60)}`, 'inf');
-  } else {
-    toast('Paste a video URL or extract one from the article first', 'err');
-    return false;
+  if(currentVideoTab==='extract'){
+    if(!selectedExtractedVideo){toast('Extract a video from an article first','err');return false;}
+    videoUrl = selectedExtractedVideo.url;
+    videoLabel = selectedExtractedVideo.label;
+  } else if(currentVideoTab==='url'){
+    videoUrl = document.getElementById('videoUrl').value.trim();
+    if(!videoUrl){toast('Enter a video URL first','err');return false;}
+    videoLabel = videoUrl;
   }
 
-  log(`Video URL resolved: "${videoUrl.slice(0,80)}"`, 'inf');
+  // ── SMART VIDEO POSTING ──
+  // Facebook /videos endpoint requires special App Review permissions.
+  // Instead we post via /feed as a link post — Facebook auto-embeds
+  // MP4 and YouTube/Vimeo links as playable video inside the post.
+  // This only needs pages_manage_posts which we already have. ✅
 
-  const isYT  = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
-  const isVim = videoUrl.includes('vimeo.com');
-  const isDirect = videoUrl.match(/\.(mp4|webm|mov|avi|mkv)(\?|#|$)/i)
-                || videoUrl.includes('blob:')
-                || /\/video\?.*src=/i.test(videoUrl);
-  const isStream = videoUrl.match(/\.(m3u8|ts|mpd)(\?|#|$)/i);
-
-  const vType = isYT?'YouTube':isVim?'Vimeo':isDirect?'Direct MP4':isStream?'Stream':'PageURL';
-  log(`Video type detected: ${vType} — ${videoLabel.slice(0,60)}`, 'inf');
-  showProgress(15, 'Preparing video post…');
+  log(`Posting video as link post: ${videoLabel.slice(0,40)}…`, 'inf');
+  showProgress(20, 'Posting video to Facebook…');
 
   try{
+    // Build caption — append video URL so Facebook scrapes and embeds it
+    const isYT  = videoUrl.includes('youtube') || videoUrl.includes('youtu.be');
+    const isVim = videoUrl.includes('vimeo.com');
+    const isMp4 = videoUrl.match(/\.mp4/i);
 
-    // ── CASE 1: YouTube / Vimeo ──
-    if(isYT || isVim){
-      log('Posting YouTube/Vimeo as embedded link…', 'inf');
-      showProgress(40, 'Posting to Facebook…');
-      const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:cleanToken };
-      const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-      const data = await res.json();
-      log(`FB response: ${JSON.stringify(data)}`, 'inf');
-      if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-      if(!data.id) throw new Error('No post ID returned');
-      showProgress(100, '✓ Video posted!');
-      setTimeout(hideProgress, 2000);
-      markPosted(a, data.id, articleIdx);
-      return true;
-    }
+    // For YouTube/Vimeo use the video URL as the link (FB embeds it natively)
+    // For direct MP4 include URL in message so FB scrapes the video
+    const linkToPost = (isYT || isVim) ? videoUrl : a.url;
+    const fullCaption = isMp4
+      ? `${cap}
 
-    // ── CASE 2: Direct MP4 or stream URL ──
-    if(isDirect || isStream){
-      log('📥 Downloading video server-side then uploading to Facebook…', 'inf');
-      showProgress(20, '📥 Downloading video… (may take 10–30s for large files)');
-
-      const body = {
-        pageId: fbPageId,
-        access_token: cleanToken,
-        description: cap,
-        title: cleanTitle(a.title).slice(0,80),
-        file_url: videoUrl
-      };
-
-      // Animate progress while waiting (download + upload can take 30–90s)
-      let fakePct = 20;
-      const progressTimer = setInterval(() => {
-        if(fakePct < 85) {
-          fakePct += (fakePct < 50 ? 3 : fakePct < 70 ? 1.5 : 0.5);
-          const stage = fakePct < 45 ? '📥 Downloading video…' : fakePct < 75 ? '📤 Uploading to Facebook…' : '⏳ Finalizing…';
-          showProgress(Math.round(fakePct), stage);
-        }
-      }, 1200);
-
-      try {
-        const res = await fetch('/api/fb/video', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        clearInterval(progressTimer);
-
-        if(data.error) {
-          // Fallback: post as text+link with video URL in caption
-          log(`⚠ Direct upload failed (${data.error.message}) — falling back to link post`, 'inf');
-          showProgress(90, 'Trying fallback post…');
-          const fallbackBody = {
-            pageId: fbPageId,
-            message: cap + '\n\n🎬 Watch: ' + videoUrl,
-            link: a.url,
-            access_token: cleanToken
-          };
-          const fallRes = await fetch('/api/fb/post', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(fallbackBody)
-          });
-          const fallData = await fallRes.json();
-          if(fallData.error) throw new Error(fallData.error.message);
-          showProgress(100, '✓ Posted with video link in caption');
-          setTimeout(hideProgress, 2000);
-          markPosted(a, fallData.id, articleIdx);
-          toast('Posted! (Video URL added to caption — direct upload needs App Review)', 'ok');
-          return true;
-        }
-
-        const sizeTxt = data.fileSizeMB ? ` (${data.fileSizeMB}MB)` : '';
-        showProgress(100, `✓ Video uploaded to Facebook${sizeTxt}!`);
-        setTimeout(hideProgress, 3000);
-        markPosted(a, data.id || data.video_id, articleIdx);
-        log(`✓ Video uploaded to Facebook${sizeTxt}`, 'ok');
-        return true;
-
-      } catch(uploadErr) {
-        clearInterval(progressTimer);
-        throw uploadErr;
-      }
-    }
-
-    // ── CASE 3: Any other URL (news site page, social media, unknown) ──
-    // If user pasted this URL directly (url tab), use IT as the link so FB scrapes its OG preview.
-    // If it came from extraction, use the article URL as the link (more reliable OG data).
-    log(`Posting as page link (${currentVideoTab} tab)…`, 'inf');
-    showProgress(40, 'Posting to Facebook…');
-
-    const isUrlTab = currentVideoTab === 'url';
-    const linkUrl  = isUrlTab ? videoUrl : a.url;
-    const videoCaption = isUrlTab
-      ? cap   // pasted URL: just post the link, FB will show OG preview
-      : cap + '\n\n🎬 Watch video: ' + videoUrl;  // extracted: add video URL to caption
+🎬 Video: ${videoUrl}`
+      : cap;
 
     const body = {
       pageId: fbPageId,
-      message: videoCaption,
-      link: linkUrl,
-      access_token: cleanToken
+      message: fullCaption,
+      link: linkToPost,
+      access_token: fbToken
     };
-    const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+
+    const res = await fetch('/api/fb/post', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
     const data = await res.json();
-    log(`FB raw response: ${JSON.stringify(data)}`, 'inf');
-    if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-    if(!data.id) throw new Error('No post ID returned — check Netlify logs');
-    showProgress(100, '✓ Posted with video link!');
+    if(data.error) throw new Error(data.error.message);
+
+    showProgress(100, 'Video posted!');
     setTimeout(hideProgress, 2000);
     markPosted(a, data.id, articleIdx);
-    log(`✓ Posted! FB ID: ${data.id}`, 'ok');
     return true;
 
   }catch(err){
