@@ -2001,31 +2001,35 @@ async function postVideoToFB(articleIdx, cap) {
 
   const isYT  = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
   const isVim = videoUrl.includes('vimeo.com');
-  const isDirect = videoUrl.match(/\.(mp4|webm|mov|m3u8)(\?|$)/i);
+  const isDirect = videoUrl.match(/\.(mp4|webm|mov|avi|mkv)(\?|#|$)/i)
+                || videoUrl.includes('blob:')
+                || /\/video\?.*src=/i.test(videoUrl);
+  const isStream = videoUrl.match(/\.(m3u8|ts|mpd)(\?|#|$)/i);
 
-  log(`Video type: ${isYT?'YouTube':isVim?'Vimeo':isDirect?'Direct MP4':'Link'} — ${videoLabel.slice(0,50)}…`, 'inf');
+  const vType = isYT?'YouTube':isVim?'Vimeo':isDirect?'Direct MP4':isStream?'Stream':'PageURL';
+  log(`Video type detected: ${vType} — ${videoLabel.slice(0,60)}`, 'inf');
   showProgress(15, 'Preparing video post…');
 
   try{
 
     // ── CASE 1: YouTube / Vimeo ──
-    // Post the video URL as the link — Facebook natively embeds it as playable video
     if(isYT || isVim){
       log('Posting YouTube/Vimeo as embedded link…', 'inf');
       showProgress(40, 'Posting to Facebook…');
       const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken };
       const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       const data = await res.json();
+      log(`FB response: ${JSON.stringify(data)}`, 'inf');
       if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+      if(!data.id) throw new Error('No post ID returned');
       showProgress(100, '✓ Video posted!');
       setTimeout(hideProgress, 2000);
       markPosted(a, data.id, articleIdx);
       return true;
     }
 
-    // ── CASE 2: Direct MP4/video file URL ──
-    // Server downloads the video binary and uploads it directly to Facebook
-    if(isDirect){
+    // ── CASE 2: Direct MP4 or stream URL ──
+    if(isDirect || isStream){
       log('📥 Downloading video server-side then uploading to Facebook…', 'inf');
       showProgress(20, '📥 Downloading video… (may take 10–30s for large files)');
 
@@ -2093,17 +2097,33 @@ async function postVideoToFB(articleIdx, cap) {
       }
     }
 
-    // ── CASE 3: Any other URL (news site video page, etc.) ──
-    // Post as article link — Facebook will show OG preview with play button if the page has video OG tags
-    log('Posting video page as article link…', 'inf');
-    showProgress(40, 'Posting article link…');
-    const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken };
+    // ── CASE 3: Any other URL (news site page, social media, unknown) ──
+    // If user pasted this URL directly (url tab), use IT as the link so FB scrapes its OG preview.
+    // If it came from extraction, use the article URL as the link (more reliable OG data).
+    log(`Posting as page link (${currentVideoTab} tab)…`, 'inf');
+    showProgress(40, 'Posting to Facebook…');
+
+    const isUrlTab = currentVideoTab === 'url';
+    const linkUrl  = isUrlTab ? videoUrl : a.url;
+    const videoCaption = isUrlTab
+      ? cap   // pasted URL: just post the link, FB will show OG preview
+      : cap + '\n\n🎬 Watch video: ' + videoUrl;  // extracted: add video URL to caption
+
+    const body = {
+      pageId: fbPageId,
+      message: videoCaption,
+      link: linkUrl,
+      access_token: fbToken
+    };
     const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const data = await res.json();
+    log(`FB raw response: ${JSON.stringify(data)}`, 'inf');
     if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-    showProgress(100, '✓ Posted!');
+    if(!data.id) throw new Error('No post ID returned — check Netlify logs');
+    showProgress(100, '✓ Posted with video link!');
     setTimeout(hideProgress, 2000);
     markPosted(a, data.id, articleIdx);
+    log(`✓ Posted! FB ID: ${data.id}`, 'ok');
     return true;
 
   }catch(err){
