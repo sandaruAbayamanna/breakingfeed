@@ -1041,7 +1041,8 @@ function closeFbModal() {
 function saveAccount() {
   const name   = document.getElementById('maName').value.trim();
   const pageId = document.getElementById('maPageId').value.trim();
-  const token  = document.getElementById('maToken').value.trim();
+  // Strip ALL whitespace from token — copy-paste often adds spaces/newlines
+  const token  = document.getElementById('maToken').value.replace(/\s+/g, '');
   const lang   = document.getElementById('maLang').value;
 
   if (!name)   { toast('Enter a page name', 'err'); return; }
@@ -1099,9 +1100,14 @@ async function postToAllTargets(articleIdx) {
     try {
       log(`Posting to: ${acc.name} (${acc.lang?.toUpperCase()||'EN'})…`, 'inf');
 
-      // Set credentials for this account
+      // Set activeAccountId so postToFB/postVideoToFB reads the right credentials
+      activeAccountId = acc.id;
+
+      // Also sync hidden inputs for any legacy code paths
       document.getElementById('fbToken').value = acc.token;
       document.getElementById('fbPageId').value = acc.pageId;
+
+      log(`Token tail: …${acc.token.slice(-8)}, PageID: ${acc.pageId}`, 'inf');
 
       // Set language for this account
       const langBtn = document.getElementById(
@@ -1118,8 +1124,8 @@ async function postToAllTargets(articleIdx) {
         }
       }
 
-      // Post
-      const ok = await postNow(articleIdx, true);
+      // Post — pass account directly so credentials never get lost
+      const ok = await postToFB(articleIdx !== undefined ? articleIdx : selIdx, null, acc);
       if (ok !== false) {
         successCount++;
         log(`✓ Posted to ${acc.name}`, 'ok');
@@ -1856,11 +1862,14 @@ async function aiCaption(articleIdx){
 
 // ══════════════════════════════════════════
 // POST TO FACEBOOK
-async function postToFB(articleIdx, caption){
-  const fbToken=document.getElementById('fbToken').value.trim();
-  const fbPageId=document.getElementById('fbPageId').value.trim();
+async function postToFB(articleIdx, caption, injectedAcc){
+  // Use injected account if provided, otherwise fall back to active account
+  const activeAcc = injectedAcc || fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+  if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
+  const fbToken  = activeAcc.token.trim();
+  const fbPageId = activeAcc.pageId.trim();
   if(!fbToken||!fbPageId){
-    toast('Add a Facebook page in the sidebar first','err');
+    toast('Facebook page token or ID is missing — check your page settings','err');
     log('Missing Facebook credentials','err');
     return false;
   }
@@ -1887,7 +1896,7 @@ async function postToFB(articleIdx, caption){
 
   // ── VIDEO POST ──
   if(postType==='video'){
-    return await postVideoToFB(articleIdx, cap);
+    return await postVideoToFB(articleIdx, cap, activeAcc);
   }
 
   // ── IMAGE POST ──
@@ -1920,9 +1929,22 @@ async function postToFB(articleIdx, caption){
   // ── TEXT + LINK POST (default) ──
   try{
     const body={pageId:fbPageId,message:cap,link:a.url,access_token:fbToken};
+    log(`Sending to FB: pageId=${fbPageId}, link=${a.url.slice(0,40)}…`,'inf');
     const res=await fetch(`/api/fb/post`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const data=await res.json();
-    if(data.error)throw new Error(data.error.message);
+    // Log full raw response so we can debug
+    log(`FB raw response: ${JSON.stringify(data)}`,'inf');
+    if(data.error){
+      const errMsg = typeof data.error === 'string' ? data.error
+        : data.error.message || data.error.error_user_msg || JSON.stringify(data.error);
+      throw new Error(errMsg);
+    }
+    if(!data.id){
+      // No error but also no ID — something is wrong
+      log(`⚠ FB returned no post ID. Full response: ${JSON.stringify(data)}`,'err');
+      throw new Error('Facebook returned no post ID — check Netlify function logs');
+    }
+    log(`✓ Posted! FB post ID: ${data.id}`,'ok');
     markPosted(a, data.id, articleIdx);
     return true;
   }catch(err){
@@ -1967,58 +1989,84 @@ function copyAndOpen(){
 // ══════════════════════════════════════════
 // VIDEO UPLOAD TO FACEBOOK
 // ══════════════════════════════════════════
-async function postVideoToFB(articleIdx, cap) {
-  const fbToken=document.getElementById('fbToken').value.trim();
-  const fbPageId=document.getElementById('fbPageId').value.trim();
+async function postVideoToFB(articleIdx, cap, injectedAcc) {
+  // Use injected account if provided, otherwise fall back to active account
+  const activeAcc = injectedAcc || fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+  if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
+  const fbToken  = activeAcc.token.trim();
+  const fbPageId = activeAcc.pageId.trim();
+  log(`Video post using account: ${activeAcc.name}, pageId: ${fbPageId}, token length: ${fbToken.length}, tail: …${fbToken.slice(-8)}`, 'inf');
+  if(!fbToken || !fbPageId){ toast('Facebook page token or ID is empty — re-add the page','err'); return false; }
+  // Sanitize token — remove any whitespace or newlines that may have crept in
+  const cleanToken = fbToken.replace(/\s+/g, '');
+  if(cleanToken.length !== fbToken.length) log(`⚠ Token had whitespace stripped (${fbToken.length} → ${cleanToken.length} chars)`, 'inf');
   const a=articles[articleIdx];
 
   // Determine the video URL to use
+  // ⚠ Capture IMMEDIATELY — selectArt() or lang switching may clear these fields
   let videoUrl = '';
   let videoLabel = '';
 
-  if(currentVideoTab==='extract'){
-    if(!selectedExtractedVideo){toast('Extract a video from an article first','err');return false;}
-    videoUrl = selectedExtractedVideo.url;
-    videoLabel = selectedExtractedVideo.label;
-  } else if(currentVideoTab==='url'){
-    videoUrl = document.getElementById('videoUrl').value.trim();
-    if(!videoUrl){toast('Enter a video URL first','err');return false;}
-    videoLabel = videoUrl;
+  // Snapshot current values before anything can wipe them
+  const snapExtracted = selectedExtractedVideo;
+  const snapUrlInput  = document.getElementById('videoUrl')?.value?.trim() || '';
+  const snapTab       = currentVideoTab;
+
+  log(`Video tab: "${snapTab}", extractedVideo: ${snapExtracted?snapExtracted.url.slice(0,40):'null'}, urlInput: "${snapUrlInput.slice(0,40)}"`, 'inf');
+
+  // Priority: if an extracted video is selected, always use it regardless of active tab
+  if(snapExtracted) {
+    videoUrl   = snapExtracted.url;
+    videoLabel = snapExtracted.label || snapExtracted.url;
+    log(`Using extracted video: ${videoUrl.slice(0,60)}`, 'inf');
+  } else if(snapUrlInput) {
+    videoUrl   = snapUrlInput;
+    videoLabel = snapUrlInput;
+    log(`Using pasted URL: ${videoUrl.slice(0,60)}`, 'inf');
+  } else {
+    toast('Paste a video URL or extract one from the article first', 'err');
+    return false;
   }
+
+  log(`Video URL resolved: "${videoUrl.slice(0,80)}"`, 'inf');
 
   const isYT  = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
   const isVim = videoUrl.includes('vimeo.com');
-  const isDirect = videoUrl.match(/\.(mp4|webm|mov|m3u8)(\?|$)/i);
+  const isDirect = videoUrl.match(/\.(mp4|webm|mov|avi|mkv)(\?|#|$)/i)
+                || videoUrl.includes('blob:')
+                || /\/video\?.*src=/i.test(videoUrl);
+  const isStream = videoUrl.match(/\.(m3u8|ts|mpd)(\?|#|$)/i);
 
-  log(`Video type: ${isYT?'YouTube':isVim?'Vimeo':isDirect?'Direct MP4':'Link'} — ${videoLabel.slice(0,50)}…`, 'inf');
+  const vType = isYT?'YouTube':isVim?'Vimeo':isDirect?'Direct MP4':isStream?'Stream':'PageURL';
+  log(`Video type detected: ${vType} — ${videoLabel.slice(0,60)}`, 'inf');
   showProgress(15, 'Preparing video post…');
 
   try{
 
     // ── CASE 1: YouTube / Vimeo ──
-    // Post the video URL as the link — Facebook natively embeds it as playable video
     if(isYT || isVim){
       log('Posting YouTube/Vimeo as embedded link…', 'inf');
       showProgress(40, 'Posting to Facebook…');
-      const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken };
+      const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:cleanToken };
       const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       const data = await res.json();
+      log(`FB response: ${JSON.stringify(data)}`, 'inf');
       if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+      if(!data.id) throw new Error('No post ID returned');
       showProgress(100, '✓ Video posted!');
       setTimeout(hideProgress, 2000);
       markPosted(a, data.id, articleIdx);
       return true;
     }
 
-    // ── CASE 2: Direct MP4/video file URL ──
-    // Server downloads the video binary and uploads it directly to Facebook
-    if(isDirect){
+    // ── CASE 2: Direct MP4 or stream URL ──
+    if(isDirect || isStream){
       log('📥 Downloading video server-side then uploading to Facebook…', 'inf');
       showProgress(20, '📥 Downloading video… (may take 10–30s for large files)');
 
       const body = {
         pageId: fbPageId,
-        access_token: fbToken,
+        access_token: cleanToken,
         description: cap,
         title: cleanTitle(a.title).slice(0,80),
         file_url: videoUrl
@@ -2051,7 +2099,7 @@ async function postVideoToFB(articleIdx, cap) {
             pageId: fbPageId,
             message: cap + '\n\n🎬 Watch: ' + videoUrl,
             link: a.url,
-            access_token: fbToken
+            access_token: cleanToken
           };
           const fallRes = await fetch('/api/fb/post', {
             method: 'POST',
@@ -2080,17 +2128,33 @@ async function postVideoToFB(articleIdx, cap) {
       }
     }
 
-    // ── CASE 3: Any other URL (news site video page, etc.) ──
-    // Post as article link — Facebook will show OG preview with play button if the page has video OG tags
-    log('Posting video page as article link…', 'inf');
-    showProgress(40, 'Posting article link…');
-    const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken };
+    // ── CASE 3: Any other URL (news site page, social media, unknown) ──
+    // If user pasted this URL directly (url tab), use IT as the link so FB scrapes its OG preview.
+    // If it came from extraction, use the article URL as the link (more reliable OG data).
+    log(`Posting as page link (${currentVideoTab} tab)…`, 'inf');
+    showProgress(40, 'Posting to Facebook…');
+
+    const isUrlTab = currentVideoTab === 'url';
+    const linkUrl  = isUrlTab ? videoUrl : a.url;
+    const videoCaption = isUrlTab
+      ? cap   // pasted URL: just post the link, FB will show OG preview
+      : cap + '\n\n🎬 Watch video: ' + videoUrl;  // extracted: add video URL to caption
+
+    const body = {
+      pageId: fbPageId,
+      message: videoCaption,
+      link: linkUrl,
+      access_token: cleanToken
+    };
     const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
     const data = await res.json();
+    log(`FB raw response: ${JSON.stringify(data)}`, 'inf');
     if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-    showProgress(100, '✓ Posted!');
+    if(!data.id) throw new Error('No post ID returned — check Netlify logs');
+    showProgress(100, '✓ Posted with video link!');
     setTimeout(hideProgress, 2000);
     markPosted(a, data.id, articleIdx);
+    log(`✓ Posted! FB ID: ${data.id}`, 'ok');
     return true;
 
   }catch(err){
