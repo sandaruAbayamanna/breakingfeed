@@ -2002,15 +2002,31 @@ async function postVideoToFB(articleIdx, cap) {
   let videoUrl = '';
   let videoLabel = '';
 
+  log(`Video tab: "${currentVideoTab}", selectedExtractedVideo: ${selectedExtractedVideo?selectedExtractedVideo.url.slice(0,40):'null'}`, 'inf');
+
   if(currentVideoTab==='extract'){
-    if(!selectedExtractedVideo){toast('Extract a video from an article first','err');return false;}
-    videoUrl = selectedExtractedVideo.url;
-    videoLabel = selectedExtractedVideo.label;
+    if(!selectedExtractedVideo){
+      log('No extracted video selected — switching to URL tab check','inf');
+      // Fall through to check videoUrl input as fallback
+      videoUrl = document.getElementById('videoUrl').value.trim();
+      if(!videoUrl){ toast('Extract a video or paste a URL first','err'); return false; }
+      videoLabel = videoUrl;
+    } else {
+      videoUrl = selectedExtractedVideo.url;
+      videoLabel = selectedExtractedVideo.label || videoUrl;
+    }
   } else if(currentVideoTab==='url'){
     videoUrl = document.getElementById('videoUrl').value.trim();
-    if(!videoUrl){toast('Enter a video URL first','err');return false;}
+    if(!videoUrl){ toast('Enter a video URL first','err'); return false; }
+    videoLabel = videoUrl;
+  } else {
+    // Unknown tab — try videoUrl input
+    videoUrl = document.getElementById('videoUrl').value.trim();
+    if(!videoUrl){ toast('Enter a video URL','err'); return false; }
     videoLabel = videoUrl;
   }
+
+  log(`Video URL resolved: "${videoUrl.slice(0,80)}"`, 'inf');
 
   const isYT  = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
   const isVim = videoUrl.includes('vimeo.com');
