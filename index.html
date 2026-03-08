@@ -1857,10 +1857,13 @@ async function aiCaption(articleIdx){
 // ══════════════════════════════════════════
 // POST TO FACEBOOK
 async function postToFB(articleIdx, caption){
-  const fbToken=document.getElementById('fbToken').value.trim();
-  const fbPageId=document.getElementById('fbPageId').value.trim();
+  // Always read credentials fresh from fbAccounts — never rely on hidden inputs
+  const activeAcc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+  if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
+  const fbToken  = activeAcc.token.trim();
+  const fbPageId = activeAcc.pageId.trim();
   if(!fbToken||!fbPageId){
-    toast('Add a Facebook page in the sidebar first','err');
+    toast('Facebook page token or ID is missing — check your page settings','err');
     log('Missing Facebook credentials','err');
     return false;
   }
@@ -1981,8 +1984,12 @@ function copyAndOpen(){
 // VIDEO UPLOAD TO FACEBOOK
 // ══════════════════════════════════════════
 async function postVideoToFB(articleIdx, cap) {
-  const fbToken=document.getElementById('fbToken').value.trim();
-  const fbPageId=document.getElementById('fbPageId').value.trim();
+  // Always read credentials fresh from fbAccounts — never rely on hidden inputs
+  const activeAcc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+  if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
+  const fbToken  = activeAcc.token.trim();
+  const fbPageId = activeAcc.pageId.trim();
+  if(!fbToken || !fbPageId){ toast('Facebook page token or ID is empty','err'); return false; }
   const a=articles[articleIdx];
 
   // Determine the video URL to use
