@@ -36,3 +36,8 @@
   from = "/api/ai-caption"
   to = "/.netlify/functions/ai-caption"
   status = 200
+
+[[redirects]]
+  from = "/api/news/rss"
+  to = "/.netlify/functions/fetch-rss"
+  status = 200

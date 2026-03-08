@@ -527,13 +527,16 @@ select.inp{cursor:pointer;}
     <div class="sb-section">
       <div class="sb-label">News Source</div>
       <select class="inp" id="newsProvider" onchange="onProviderChange()">
-        <option value="gnews">⚡ GNews.io — Real-time (recommended)</option>
-        <option value="newsdata">🌍 NewsData.io — Real-time + Video</option>
-        <option value="guardian">📰 The Guardian — Free, no delay</option>
-        <option value="newsapi">🕐 NewsAPI.org — 24h delay (dev plan)</option>
+        <option value="rss">⚡ RSS Feeds — TRUE Real-time (no key needed)</option>
+        <option value="gnews">🔑 GNews.io — Real-time</option>
+        <option value="newsdata">🔑 NewsData.io — Real-time + Video</option>
+        <option value="guardian">🔑 The Guardian — Free</option>
+        <option value="newsapi">🕐 NewsAPI.org — 24h delay</option>
       </select>
-      <input class="inp" type="password" id="newsKey" placeholder="API key for selected source…" />
-      <div id="apiHint" style="font-size:10px;color:var(--amber);font-family:'JetBrains Mono',monospace;margin-top:-4px;margin-bottom:6px;line-height:1.5;"></div>
+      <div id="apiKeyWrap">
+        <input class="inp" type="password" id="newsKey" placeholder="API key for selected source…" />
+      </div>
+      <div id="apiHint" style="font-size:10px;color:var(--green);font-family:'JetBrains Mono',monospace;margin-top:-4px;margin-bottom:6px;line-height:1.5;"></div>
     </div>
 
     <div class="sb-section">
@@ -881,31 +884,33 @@ document.querySelectorAll('.chip').forEach(c=>{
 // PROVIDER HINT MESSAGES
 // ══════════════════════════════════════════
 const PROVIDER_HINTS = {
-  gnews:    '⚡ Real-time · Free: 100 req/day · Get key: gnews.io',
-  newsdata: '🌍 Real-time · Free: 200 req/day · Get key: newsdata.io',
-  guardian: '📰 Real-time · Free: 500 req/day · Get key: open-platform.theguardian.com',
-  newsapi:  '⚠ 24hr DELAY on free plan · Get key: newsapi.org',
+  rss:      '✅ Zero delay · No key needed · 15 major sources · Updates every minute',
+  gnews:    '🔑 Real-time · Free: 100 req/day · gnews.io',
+  newsdata: '🔑 Real-time · Free: 200 req/day · newsdata.io',
+  guardian: '🔑 Real-time · Free: 500 req/day · open-platform.theguardian.com',
+  newsapi:  '⚠ 24hr DELAY on free plan · newsapi.org',
 };
 const PROVIDER_NAMES = {
-  gnews:'GNews.io', newsdata:'NewsData.io', guardian:'The Guardian', newsapi:'NewsAPI.org'
+  rss:'RSS Feeds', gnews:'GNews.io', newsdata:'NewsData.io', guardian:'The Guardian', newsapi:'NewsAPI.org'
 };
 
 function onProviderChange() {
   const p = document.getElementById('newsProvider').value;
   const hint = document.getElementById('apiHint');
+  const keyWrap = document.getElementById('apiKeyWrap');
   hint.textContent = PROVIDER_HINTS[p] || '';
-  hint.style.color = p === 'newsapi' ? 'var(--red)' : 'var(--amber)';
-  const keyInp = document.getElementById('newsKey');
-  keyInp.placeholder = `${PROVIDER_NAMES[p]} API key…`;
+  hint.style.color = p==='newsapi' ? 'var(--red)' : p==='rss' ? 'var(--green)' : 'var(--amber)';
+  // Hide API key input for RSS — no key needed
+  keyWrap.style.display = p === 'rss' ? 'none' : 'block';
 }
 
 // Run on load
 document.addEventListener('DOMContentLoaded', onProviderChange);
 
 async function fetchNews(){
-  const key = document.getElementById('newsKey').value.trim();
   const provider = document.getElementById('newsProvider').value;
-  if(!key){ toast(`Enter your ${PROVIDER_NAMES[provider]} key`, 'err'); return; }
+  const key = document.getElementById('newsKey').value.trim();
+  if(provider !== 'rss' && !key){ toast(`Enter your ${PROVIDER_NAMES[provider]} key`, 'err'); return; }
 
   const q    = document.getElementById('searchQ').value || 'war conflict';
   const lang = document.getElementById('lang').value;
@@ -915,29 +920,43 @@ async function fetchNews(){
   log(`[${PROVIDER_NAMES[provider]}] Fetching: "${q.slice(0,40)}"…`, 'inf');
 
   try {
-    // Fetch war/conflict search + top headlines in parallel
-    const [searchRes, topRes] = await Promise.all([
-      fetch('/api/news/fetch', {
+    let rawArticles = [];
+
+    // ── RSS: no API key, zero delay ──
+    if(provider === 'rss') {
+      const res = await fetch('/api/news/rss', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, apiKey: key, query: q, language: lang, sortBy: sort, pageSize: 20, type: 'search' })
-      }),
-      fetch('/api/news/fetch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, apiKey: key, query: q, language: lang, sortBy: sort, pageSize: 10, type: 'headlines' })
-      })
-    ]);
+        body: JSON.stringify({ query: q })
+      });
+      const data = await res.json();
+      if(data.status !== 'ok') throw new Error(data.message || 'RSS fetch error');
+      rawArticles = data.articles || [];
 
-    const searchData = await searchRes.json();
-    const topData    = await topRes.json();
+    // ── API providers ──
+    } else {
+      const [searchRes, topRes] = await Promise.all([
+        fetch('/api/news/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, apiKey: key, query: q, language: lang, sortBy: sort, pageSize: 20, type: 'search' })
+        }),
+        fetch('/api/news/fetch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, apiKey: key, query: q, language: lang, sortBy: sort, pageSize: 10, type: 'headlines' })
+        })
+      ]);
+      const searchData = await searchRes.json();
+      const topData    = await topRes.json();
+      if(searchData.status !== 'ok') throw new Error(searchData.message || 'API error');
+      const topArts = (topData.articles || []).map(a => ({...a, _top: true}));
+      rawArticles = [...(searchData.articles||[]), ...topArts];
+    }
 
-    if (searchData.status !== 'ok') throw new Error(searchData.message || 'API error');
-
-    // Merge & dedupe — mark top headlines
-    const topArts = (topData.articles || []).map(a => ({...a, _top: true}));
+    // Dedupe
     const seen = new Set();
-    articles = [...(searchData.articles||[]), ...topArts].filter(a => {
+    articles = rawArticles.filter(a => {
       if (!a.title || a.title === '[Removed]' || seen.has(a.url)) return false;
       seen.add(a.url); return true;
     });
