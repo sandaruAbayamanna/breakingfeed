@@ -2003,31 +2003,29 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
   const a=articles[articleIdx];
 
   // Determine the video URL to use
+  // ⚠ Capture IMMEDIATELY — selectArt() or lang switching may clear these fields
   let videoUrl = '';
   let videoLabel = '';
 
-  log(`Video tab: "${currentVideoTab}", selectedExtractedVideo: ${selectedExtractedVideo?selectedExtractedVideo.url.slice(0,40):'null'}`, 'inf');
+  // Snapshot current values before anything can wipe them
+  const snapExtracted = selectedExtractedVideo;
+  const snapUrlInput  = document.getElementById('videoUrl')?.value?.trim() || '';
+  const snapTab       = currentVideoTab;
 
-  if(currentVideoTab==='extract'){
-    if(!selectedExtractedVideo){
-      log('No extracted video selected — switching to URL tab check','inf');
-      // Fall through to check videoUrl input as fallback
-      videoUrl = document.getElementById('videoUrl').value.trim();
-      if(!videoUrl){ toast('Extract a video or paste a URL first','err'); return false; }
-      videoLabel = videoUrl;
-    } else {
-      videoUrl = selectedExtractedVideo.url;
-      videoLabel = selectedExtractedVideo.label || videoUrl;
-    }
-  } else if(currentVideoTab==='url'){
-    videoUrl = document.getElementById('videoUrl').value.trim();
-    if(!videoUrl){ toast('Enter a video URL first','err'); return false; }
-    videoLabel = videoUrl;
+  log(`Video tab: "${snapTab}", extractedVideo: ${snapExtracted?snapExtracted.url.slice(0,40):'null'}, urlInput: "${snapUrlInput.slice(0,40)}"`, 'inf');
+
+  // Priority: if an extracted video is selected, always use it regardless of active tab
+  if(snapExtracted) {
+    videoUrl   = snapExtracted.url;
+    videoLabel = snapExtracted.label || snapExtracted.url;
+    log(`Using extracted video: ${videoUrl.slice(0,60)}`, 'inf');
+  } else if(snapUrlInput) {
+    videoUrl   = snapUrlInput;
+    videoLabel = snapUrlInput;
+    log(`Using pasted URL: ${videoUrl.slice(0,60)}`, 'inf');
   } else {
-    // Unknown tab — try videoUrl input
-    videoUrl = document.getElementById('videoUrl').value.trim();
-    if(!videoUrl){ toast('Enter a video URL','err'); return false; }
-    videoLabel = videoUrl;
+    toast('Paste a video URL or extract one from the article first', 'err');
+    return false;
   }
 
   log(`Video URL resolved: "${videoUrl.slice(0,80)}"`, 'inf');
