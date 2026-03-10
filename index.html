@@ -995,7 +995,18 @@ select.inp{cursor:pointer;}
 
           <!-- URL TAB -->
           <div id="videoUrlPanel" style="display:none;">
-            <input class="inp" type="text" id="videoUrl" placeholder="https://…/video.mp4" oninput="previewVideoUrl()" />
+            <div style="display:flex;gap:6px;margin-bottom:6px;">
+              <input class="inp" type="text" id="videoUrl" placeholder="Paste video URL…" oninput="previewVideoUrl()" style="margin-bottom:0;flex:1;" />
+            </div>
+            <!-- Extract buttons -->
+            <div style="display:flex;gap:6px;margin-bottom:8px;">
+              <button class="btn btn-ghost" style="flex:1;font-size:10px;padding:6px;" onclick="extractArticleVideoUrl()">📰 From Article</button>
+              <button class="btn btn-ghost" style="flex:1;font-size:10px;padding:6px;" onclick="extractAllVideoUrls()">🔍 Find Videos</button>
+            </div>
+            <!-- Found videos list -->
+            <div id="urlVideoResults" style="display:none;margin-bottom:8px;"></div>
+            <!-- Upload mode indicator -->
+            <div id="videoUploadMode" style="font-family:'JetBrains Mono',monospace;font-size:9px;margin-top:4px;display:none;"></div>
             <div id="videoUrlPrev" style="margin-top:6px;display:none;"></div>
           </div>
 
@@ -1647,7 +1658,7 @@ function selectArt(i){
 function buildCaption(a){
   const brk=isBreaking(a);
   const emoji=brk?'🚨':'📰';
-  return `${emoji} ${brk?'BREAKING: ':''}${cleanTitle(a.title)}\n\n${a.description||''}\n\n📍 ${a.source.name}  |  ${new Date(a.publishedAt).toUTCString().slice(0,22)}\n🔗 ${a.url}\n\n#BreakingNews #WorldNews ${brk?'#Breaking':''} #${a.source.name.replace(/\s+/g,'')}`;
+  return `${emoji} ${cleanTitle(a.title)}\n\n${a.description||''}\n\n📍 ${a.source.name}  |  ${new Date(a.publishedAt).toUTCString().slice(0,22)}\n🔗 ${a.url}\n\n#BreakingNews #WorldNews #${a.source.name.replace(/\s+/g,'')}`;
 }
 
 // ══════════════════════════════════════════
@@ -2214,174 +2225,128 @@ function copyAndOpen(){
 // VIDEO UPLOAD TO FACEBOOK
 // ══════════════════════════════════════════
 async function postVideoToFB(articleIdx, cap, injectedAcc) {
-  // Use injected account if provided, otherwise fall back to active account
   const activeAcc = injectedAcc || fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
   if(!activeAcc){ toast('Add a Facebook page first','err'); return false; }
-  const fbToken  = activeAcc.token.trim();
+  const fbToken  = activeAcc.token.replace(/\s+/g,'');
   const fbPageId = activeAcc.pageId.trim();
-  log(`Video post using account: ${activeAcc.name}, pageId: ${fbPageId}, token length: ${fbToken.length}, tail: …${fbToken.slice(-8)}`, 'inf');
-  if(!fbToken || !fbPageId){ toast('Facebook page token or ID is empty — re-add the page','err'); return false; }
-  // Sanitize token — remove any whitespace or newlines that may have crept in
-  const cleanToken = fbToken.replace(/\s+/g, '');
-  if(cleanToken.length !== fbToken.length) log(`⚠ Token had whitespace stripped (${fbToken.length} → ${cleanToken.length} chars)`, 'inf');
-  const a=articles[articleIdx];
+  log(`Video post: account=${activeAcc.name}, pageId=${fbPageId}, token …${fbToken.slice(-8)}`, 'inf');
+  if(!fbToken || !fbPageId){ toast('Facebook page token or ID is empty','err'); return false; }
 
-  // Determine the video URL to use
-  // ⚠ Capture IMMEDIATELY — selectArt() or lang switching may clear these fields
+  const a = articles[articleIdx];
+
+  // ── Snapshot URL immediately before anything can clear it ──
+  const snapExtracted   = selectedExtractedVideo;
+  const snapUrlInput    = document.getElementById('videoUrl')?.value?.trim() || '';
+  const snapTab         = currentVideoTab;
+
+  log(`Video tab:"${snapTab}" extracted:${snapExtracted?snapExtracted.url.slice(0,40):'null'} urlInput:"${snapUrlInput.slice(0,40)}"`, 'inf');
+
   let videoUrl = '';
   let videoLabel = '';
 
-  // Snapshot current values before anything can wipe them
-  const snapExtracted = selectedExtractedVideo;
-  const snapUrlInput  = document.getElementById('videoUrl')?.value?.trim() || '';
-  const snapTab       = currentVideoTab;
-
-  log(`Video tab: "${snapTab}", extractedVideo: ${snapExtracted?snapExtracted.url.slice(0,40):'null'}, urlInput: "${snapUrlInput.slice(0,40)}"`, 'inf');
-
-  // Priority: if an extracted video is selected, always use it regardless of active tab
   if(snapExtracted) {
     videoUrl   = snapExtracted.url;
     videoLabel = snapExtracted.label || snapExtracted.url;
-    log(`Using extracted video: ${videoUrl.slice(0,60)}`, 'inf');
   } else if(snapUrlInput) {
     videoUrl   = snapUrlInput;
     videoLabel = snapUrlInput;
-    log(`Using pasted URL: ${videoUrl.slice(0,60)}`, 'inf');
   } else {
-    toast('Paste a video URL or extract one from the article first', 'err');
+    toast('Extract a video or paste a video URL first','err');
     return false;
   }
 
-  log(`Video URL resolved: "${videoUrl.slice(0,80)}"`, 'inf');
+  log(`Video URL: "${videoUrl.slice(0,80)}"`, 'inf');
 
   const isYT  = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
   const isVim = videoUrl.includes('vimeo.com');
-  const isDirect = videoUrl.match(/\.(mp4|webm|mov|avi|mkv)(\?|#|$)/i)
-                || videoUrl.includes('blob:')
-                || /\/video\?.*src=/i.test(videoUrl);
-  const isStream = videoUrl.match(/\.(m3u8|ts|mpd)(\?|#|$)/i);
 
-  const vType = isYT?'YouTube':isVim?'Vimeo':isDirect?'Direct MP4':isStream?'Stream':'PageURL';
-  log(`Video type detected: ${vType} — ${videoLabel.slice(0,60)}`, 'inf');
-  showProgress(15, 'Preparing video post…');
-
-  try{
-
-    // ── CASE 1: YouTube / Vimeo ──
-    if(isYT || isVim){
-      log('Posting YouTube/Vimeo as embedded link…', 'inf');
-      showProgress(40, 'Posting to Facebook…');
-      const body = { pageId:fbPageId, message:cap, link:videoUrl, access_token:cleanToken };
-      const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  // ── YouTube / Vimeo: post as embedded link (FB natively plays these) ──
+  if(isYT || isVim) {
+    log('YouTube/Vimeo — posting as embedded link…', 'inf');
+    showProgress(30, 'Posting to Facebook…');
+    try {
+      const res = await fetch('/api/fb/post', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken })
+      });
       const data = await res.json();
       log(`FB response: ${JSON.stringify(data)}`, 'inf');
       if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-      if(!data.id) throw new Error('No post ID returned');
       showProgress(100, '✓ Video posted!');
       setTimeout(hideProgress, 2000);
       markPosted(a, data.id, articleIdx);
       return true;
+    } catch(err) {
+      hideProgress();
+      log('YT/Vimeo post failed: '+err.message,'err');
+      toast('Post failed: '+err.message,'err');
+      addToQueue(a.title,'ERROR','fail');
+      return false;
     }
+  }
 
-    // ── CASE 2: Direct MP4 or stream URL ──
-    if(isDirect || isStream){
-      log('📥 Downloading video server-side then uploading to Facebook…', 'inf');
-      showProgress(20, '📥 Downloading video… (may take 10–30s for large files)');
+  // ── All other videos: ALWAYS download + direct binary upload to Facebook ──
+  log('📥 Downloading video then uploading directly to Facebook…', 'inf');
+  showProgress(10, '📥 Downloading video…');
 
-      const body = {
+  // Animate progress bar during long operation
+  let fakePct = 10;
+  const timer = setInterval(() => {
+    if(fakePct < 85) {
+      fakePct += fakePct < 40 ? 4 : fakePct < 65 ? 2 : 0.6;
+      const stage = fakePct < 45 ? '📥 Downloading video…' : fakePct < 75 ? '📤 Uploading to Facebook…' : '⏳ Finalizing…';
+      showProgress(Math.round(fakePct), stage);
+    }
+  }, 1000);
+
+  try {
+    const res = await fetch('/api/fb/video', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
         pageId: fbPageId,
-        access_token: cleanToken,
+        access_token: fbToken,
         description: cap,
-        title: cleanTitle(a.title).slice(0,80),
+        title: cleanTitle(a.title).slice(0, 80),
         file_url: videoUrl
-      };
+      })
+    });
+    const data = await res.json();
+    clearInterval(timer);
+    log(`FB video response: ${JSON.stringify(data)}`, 'inf');
 
-      // Animate progress while waiting (download + upload can take 30–90s)
-      let fakePct = 20;
-      const progressTimer = setInterval(() => {
-        if(fakePct < 85) {
-          fakePct += (fakePct < 50 ? 3 : fakePct < 70 ? 1.5 : 0.5);
-          const stage = fakePct < 45 ? '📥 Downloading video…' : fakePct < 75 ? '📤 Uploading to Facebook…' : '⏳ Finalizing…';
-          showProgress(Math.round(fakePct), stage);
-        }
-      }, 1200);
+    if(data.error) {
+      // Direct upload failed — post as link with video URL in caption as fallback
+      const errMsg = data.error.message || JSON.stringify(data.error);
+      log(`⚠ Direct upload failed (${errMsg}) — posting as link with video URL in caption`, 'inf');
+      showProgress(88, 'Posting as link fallback…');
 
-      try {
-        const res = await fetch('/api/fb/video', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        clearInterval(progressTimer);
-
-        if(data.error) {
-          // Fallback: post as text+link with video URL in caption
-          log(`⚠ Direct upload failed (${data.error.message}) — falling back to link post`, 'inf');
-          showProgress(90, 'Trying fallback post…');
-          const fallbackBody = {
-            pageId: fbPageId,
-            message: cap + '\n\n🎬 Watch: ' + videoUrl,
-            link: a.url,
-            access_token: cleanToken
-          };
-          const fallRes = await fetch('/api/fb/post', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(fallbackBody)
-          });
-          const fallData = await fallRes.json();
-          if(fallData.error) throw new Error(fallData.error.message);
-          showProgress(100, '✓ Posted with video link in caption');
-          setTimeout(hideProgress, 2000);
-          markPosted(a, fallData.id, articleIdx);
-          toast('Posted! (Video URL added to caption — direct upload needs App Review)', 'ok');
-          return true;
-        }
-
-        const sizeTxt = data.fileSizeMB ? ` (${data.fileSizeMB}MB)` : '';
-        showProgress(100, `✓ Video uploaded to Facebook${sizeTxt}!`);
-        setTimeout(hideProgress, 3000);
-        markPosted(a, data.id || data.video_id, articleIdx);
-        log(`✓ Video uploaded to Facebook${sizeTxt}`, 'ok');
-        return true;
-
-      } catch(uploadErr) {
-        clearInterval(progressTimer);
-        throw uploadErr;
-      }
+      const fallRes = await fetch('/api/fb/post', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          pageId: fbPageId,
+          message: cap + '\n\n🎬 Watch: ' + videoUrl,
+          link: a.url,
+          access_token: fbToken
+        })
+      });
+      const fallData = await fallRes.json();
+      if(fallData.error) throw new Error(fallData.error.message);
+      showProgress(100, '✓ Posted (video URL in caption)');
+      setTimeout(hideProgress, 2500);
+      markPosted(a, fallData.id, articleIdx);
+      toast('Posted! Direct upload needs App Review — video URL added to caption', 'ok');
+      return true;
     }
 
-    // ── CASE 3: Any other URL (news site page, social media, unknown) ──
-    // If user pasted this URL directly (url tab), use IT as the link so FB scrapes its OG preview.
-    // If it came from extraction, use the article URL as the link (more reliable OG data).
-    log(`Posting as page link (${currentVideoTab} tab)…`, 'inf');
-    showProgress(40, 'Posting to Facebook…');
-
-    const isUrlTab = currentVideoTab === 'url';
-    const linkUrl  = isUrlTab ? videoUrl : a.url;
-    const videoCaption = isUrlTab
-      ? cap   // pasted URL: just post the link, FB will show OG preview
-      : cap + '\n\n🎬 Watch video: ' + videoUrl;  // extracted: add video URL to caption
-
-    const body = {
-      pageId: fbPageId,
-      message: videoCaption,
-      link: linkUrl,
-      access_token: cleanToken
-    };
-    const res = await fetch('/api/fb/post', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-    const data = await res.json();
-    log(`FB raw response: ${JSON.stringify(data)}`, 'inf');
-    if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-    if(!data.id) throw new Error('No post ID returned — check Netlify logs');
-    showProgress(100, '✓ Posted with video link!');
-    setTimeout(hideProgress, 2000);
-    markPosted(a, data.id, articleIdx);
-    log(`✓ Posted! FB ID: ${data.id}`, 'ok');
+    const sizeTxt = data.fileSizeMB ? ` (${data.fileSizeMB}MB)` : '';
+    showProgress(100, `✓ Video uploaded${sizeTxt}!`);
+    setTimeout(hideProgress, 3000);
+    markPosted(a, data.id || data.video_id, articleIdx);
+    log(`✓ Video uploaded directly to Facebook${sizeTxt}`, 'ok');
     return true;
 
-  }catch(err){
+  } catch(err) {
+    clearInterval(timer);
     hideProgress();
     log('Video post failed: '+err.message,'err');
     toast('Post failed: '+err.message,'err');
@@ -2390,6 +2355,7 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
   }
 
 }
+
 
 function showProgress(pct, msg){
   const wrap=document.getElementById('progressWrap');
@@ -2506,6 +2472,82 @@ function toggleAutoPost(btn){
 // ══════════════════════════════════════════
 // IMAGE EXTRACTION
 // ══════════════════════════════════════════
+
+// ── Video URL extract helpers (for Paste URL tab) ──
+function extractArticleVideoUrl() {
+  if(selIdx === null){ toast('Select an article first','err'); return; }
+  const a = articles[selIdx];
+  // Try to find a video URL from the article
+  const candidates = [];
+  if(a.video_url) candidates.push(a.video_url);
+  if(a.urlToImage && a.urlToImage.match(/\.(mp4|webm|mov)/i)) candidates.push(a.urlToImage);
+  if(candidates.length) {
+    document.getElementById('videoUrl').value = candidates[0];
+    showVideoUploadMode(candidates[0]);
+    previewVideoUrl();
+    toast('Video URL loaded ✓','ok');
+  } else {
+    toast('No direct video URL on this article — try Find Videos','err');
+  }
+}
+
+async function extractAllVideoUrls() {
+  if(selIdx === null){ toast('Select an article first','err'); return; }
+  const a = articles[selIdx];
+  const resultsEl = document.getElementById('urlVideoResults');
+  resultsEl.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--muted2);padding:4px;">🔍 Scanning for videos…</div>';
+  resultsEl.style.display = 'block';
+
+  try {
+    const res = await fetch('/api/extract-video', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url: a.url })
+    });
+    const data = await res.json();
+    const videos = data.videos || [];
+
+    if(!videos.length) {
+      resultsEl.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--muted2);padding:4px;">No videos found on this page</div>';
+      return;
+    }
+
+    resultsEl.innerHTML = `
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:6px;">${videos.length} video(s) found:</div>
+      ${videos.map((v,i) => `
+        <div onclick="selectUrlVideo('${(v.url||'').replace(/'/g,"\'")}','${(v.label||'').replace(/'/g,"\'")}',this)"
+          style="cursor:pointer;padding:7px 10px;border:1px solid var(--border2);border-radius:5px;margin-bottom:5px;transition:all 0.15s;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text);margin-bottom:2px;">${v.label||'Video '+(i+1)}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);word-break:break-all;">${(v.url||'').slice(0,60)}…</div>
+        </div>`).join('')}`;
+  } catch(err) {
+    resultsEl.innerHTML = `<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--red);padding:4px;">Failed: ${err.message}</div>`;
+  }
+}
+
+function selectUrlVideo(url, label, el) {
+  document.querySelectorAll('#urlVideoResults div[onclick]').forEach(d => d.style.borderColor='var(--border2)');
+  el.style.borderColor = 'var(--amber)';
+  document.getElementById('videoUrl').value = url;
+  showVideoUploadMode(url);
+  previewVideoUrl();
+  log(`Video selected: ${label||url.slice(0,40)}`, 'ok');
+  toast('Video selected ✓','ok');
+}
+
+function showVideoUploadMode(url) {
+  const el = document.getElementById('videoUploadMode');
+  if(!el) return;
+  const isYT = url.includes('youtube') || url.includes('youtu.be');
+  const isVim = url.includes('vimeo.com');
+  if(isYT || isVim) {
+    el.style.color = 'var(--blue-fb)';
+    el.textContent = '📘 Will post as embedded YouTube/Vimeo video';
+  } else {
+    el.style.color = 'var(--green)';
+    el.textContent = '📤 Will download & upload directly to Facebook';
+  }
+  el.style.display = 'block';
+}
 
 function extractArticleImage() {
   if(selIdx === null){ toast('Select an article first', 'err'); return; }
