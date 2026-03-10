@@ -41,3 +41,8 @@
   from = "/api/news/rss"
   to = "/.netlify/functions/fetch-rss"
   status = 200
+
+[[redirects]]
+  from = "/api/fb/photo"
+  to = "/.netlify/functions/fb-photo"
+  status = 200

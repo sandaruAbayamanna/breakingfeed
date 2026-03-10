@@ -954,8 +954,22 @@ select.inp{cursor:pointer;}
 
         <!-- Image URL panel -->
         <div id="panelImage" style="display:none;">
-          <input class="inp" type="text" id="imageUrl" placeholder="https://example.com/image.jpg" oninput="previewImageUrl()" />
+          <div style="display:flex;gap:6px;margin-bottom:6px;">
+            <input class="inp" type="text" id="imageUrl" placeholder="Paste image URL or extract below…" oninput="previewImageUrl()" style="margin-bottom:0;flex:1;" />
+          </div>
+          <!-- Extract button row -->
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <button class="btn btn-ghost" style="flex:1;font-size:10px;padding:6px;" onclick="extractArticleImage()">🖼 Use Article Image</button>
+            <button class="btn btn-ghost" style="flex:1;font-size:10px;padding:6px;" onclick="extractAllImages()">🔍 Find All Images</button>
+          </div>
+          <!-- Extracted images grid -->
+          <div id="imageResults" style="display:none;margin-bottom:8px;"></div>
+          <!-- Preview -->
           <div class="media-preview" id="mediaPrev" style="display:none;margin-top:6px;"></div>
+          <!-- Upload mode indicator -->
+          <div id="imageUploadMode" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);margin-top:4px;display:none;">
+            ✓ Image will be uploaded directly to Facebook
+          </div>
         </div>
 
         <!-- Video panel -->
@@ -1654,6 +1668,15 @@ function setPostType(type, btn) {
   document.getElementById('panelText').style.display  = type==='text'  ? 'block' : 'none';
   document.getElementById('panelImage').style.display = type==='image' ? 'block' : 'none';
   document.getElementById('panelVideo').style.display = type==='video' ? 'block' : 'none';
+  // Auto-load article image when switching to image mode
+  if(type === 'image' && selIdx !== null) {
+    const img = articles[selIdx]?.urlToImage;
+    if(img && !document.getElementById('imageUrl').value) {
+      document.getElementById('imageUrl').value = img;
+      previewImageUrl();
+      document.getElementById('imageUploadMode').style.display = 'block';
+    }
+  }
   // Update FB preview
   const fbPrev = document.getElementById('fbMediaPrev');
   if(type==='text') fbPrev.innerHTML='';
@@ -2066,22 +2089,60 @@ async function postToFB(articleIdx, caption, injectedAcc){
   if(postType==='image'){
     const imgUrl = document.getElementById('imageUrl').value.trim() || a.urlToImage || '';
     try{
-      // Post as photo if image URL provided, else fall back to link post
-      let endpoint, body;
       if(imgUrl){
-        endpoint = `/api/fb/post`;
-        body = {pageId:fbPageId, message:cap, link:a.url, access_token:fbToken};
-        // Note: Facebook link posts auto-scrape OG image. For direct photo use /photos endpoint.
+        // ── Direct image upload to Facebook /photos ──
+        log(`📥 Downloading & uploading image: ${imgUrl.slice(0,60)}…`, 'inf');
+        showProgress(20, '📥 Downloading image…');
+
+        const res = await fetch('/api/fb/photo', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            pageId: fbPageId,
+            access_token: fbToken,
+            caption: cap,
+            image_url: imgUrl
+          })
+        });
+        const data = await res.json();
+        log(`FB photo response: ${JSON.stringify(data)}`, 'inf');
+
+        if(data.error){
+          // Fallback: post as link (FB scrapes OG image)
+          log(`⚠ Photo upload failed (${data.error.message}), falling back to link post…`, 'inf');
+          showProgress(70, 'Trying link post fallback…');
+          const fallRes = await fetch('/api/fb/post', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({pageId:fbPageId, message:cap, link:a.url, access_token:fbToken})
+          });
+          const fallData = await fallRes.json();
+          if(fallData.error) throw new Error(fallData.error.message);
+          showProgress(100, '✓ Posted with link preview');
+          setTimeout(hideProgress, 2000);
+          markPosted(a, fallData.id, articleIdx);
+          toast('Posted with link preview (direct upload failed)', 'ok');
+          return true;
+        }
+
+        showProgress(100, `✓ Image uploaded! (${data.sizeMB||'?'}MB)`);
+        setTimeout(hideProgress, 2000);
+        markPosted(a, data.post_id || data.id, articleIdx);
+        log(`✓ Photo posted to Facebook! ID: ${data.post_id||data.id}`, 'ok');
+        return true;
+
       } else {
-        endpoint = `/api/fb/post`;
-        body = {pageId:fbPageId, message:cap, link:a.url, access_token:fbToken};
+        // No image — plain link post
+        const res = await fetch('/api/fb/post', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({pageId:fbPageId, message:cap, link:a.url, access_token:fbToken})
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error.message);
+        markPosted(a, data.id, articleIdx);
+        return true;
       }
-      const res = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      const data = await res.json();
-      if(data.error) throw new Error(data.error.message);
-      markPosted(a, data.id, articleIdx);
-      return true;
     }catch(err){
+      hideProgress();
       log('Image post failed: '+err.message,'err');
       toast('Post failed: '+err.message,'err');
       addToQueue(a.title,'ERROR','fail');
@@ -2441,6 +2502,108 @@ function toggleAutoPost(btn){
   autoPostEnabled=btn.classList.contains('on');
   log(`Auto-post breaking: ${autoPostEnabled?'ON':'OFF'}`,autoPostEnabled?'warn':'inf');
 }
+
+// ══════════════════════════════════════════
+// IMAGE EXTRACTION
+// ══════════════════════════════════════════
+
+function extractArticleImage() {
+  if(selIdx === null){ toast('Select an article first', 'err'); return; }
+  const a = articles[selIdx];
+  const img = a.urlToImage || '';
+  if(!img){ toast('No image found for this article', 'err'); return; }
+  document.getElementById('imageUrl').value = img;
+  previewImageUrl();
+  document.getElementById('imageUploadMode').style.display = 'block';
+  log(`Article image extracted: ${img.slice(0,60)}`, 'ok');
+  toast('Article image loaded ✓', 'ok');
+}
+
+async function extractAllImages() {
+  if(selIdx === null){ toast('Select an article first', 'err'); return; }
+  const a = articles[selIdx];
+  const resultsEl = document.getElementById('imageResults');
+
+  resultsEl.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--muted2);padding:4px;">🔍 Scanning article for images…</div>';
+  resultsEl.style.display = 'block';
+
+  // Collect all possible image sources
+  const candidates = new Set();
+  if(a.urlToImage) candidates.add(a.urlToImage);
+
+  // Try to scrape article page for og:image and other images
+  try {
+    const res = await fetch('/api/extract-video', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url: a.url })
+    });
+    const data = await res.json();
+    // extract-video response may have images too
+    if(data.images) data.images.forEach(u => candidates.add(u));
+    // Also scrape og:image from the response
+    if(data.ogImage) candidates.add(data.ogImage);
+  } catch {}
+
+  // Scrape via allorigins proxy to get OG tags
+  try {
+    const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(a.url)}`;
+    const res = await fetch(proxy);
+    if(res.ok) {
+      const data = await res.json();
+      const html = data.contents || '';
+      // Extract og:image, twitter:image, and large images
+      const patterns = [
+        /property=["']og:image["'][^>]+content=["']([^"']+)["']/gi,
+        /content=["']([^"']+)["'][^>]+property=["']og:image["']/gi,
+        /name=["']twitter:image["'][^>]+content=["']([^"']+)["']/gi,
+        /content=["']([^"']+)["'][^>]+name=["']twitter:image["']/gi,
+        /<img[^>]+src=["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/gi,
+      ];
+      patterns.forEach(p => {
+        let m;
+        while((m = p.exec(html)) !== null) {
+          if(m[1] && m[1].startsWith('http')) candidates.add(m[1]);
+        }
+      });
+    }
+  } catch {}
+
+  const imgs = [...candidates].filter(u => u && u.startsWith('http')).slice(0, 8);
+
+  if(!imgs.length) {
+    resultsEl.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--red);padding:4px;">No images found</div>';
+    return;
+  }
+
+  resultsEl.innerHTML = `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:6px;">${imgs.length} image(s) found — tap to select:</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;">
+      ${imgs.map((url, i) => `
+        <div onclick="selectExtractedImage('${url.replace(/'/g,"\'")}',this)"
+          style="cursor:pointer;border:2px solid var(--border2);border-radius:6px;overflow:hidden;aspect-ratio:16/9;position:relative;">
+          <img src="${url}" style="width:100%;height:100%;object-fit:cover;"
+            onerror="this.parentElement.style.display='none'" loading="lazy" />
+        </div>`).join('')}
+    </div>`;
+}
+
+function selectExtractedImage(url, el) {
+  // Highlight selected
+  document.querySelectorAll('#imageResults div[onclick]').forEach(d => {
+    d.style.borderColor = 'var(--border2)';
+  });
+  el.style.borderColor = 'var(--green)';
+
+  document.getElementById('imageUrl').value = url;
+  previewImageUrl();
+  document.getElementById('imageUploadMode').style.display = 'block';
+  log(`Image selected: ${url.slice(0,60)}`, 'ok');
+  toast('Image selected ✓', 'ok');
+}
+
+// Auto-load article image when switching to Image post type
+const _origSetPostType = window.setPostType;
 
 // ══════════════════════════════════════════
 // MOBILE NAV — Panel switcher
