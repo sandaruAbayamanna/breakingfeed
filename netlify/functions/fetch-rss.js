@@ -38,6 +38,11 @@ exports.handler = async function (event) {
       { name: "Times of India",     url: "https://timesofindia.indiatimes.com/rssfeeds/296589292.cms" },
       { name: "NDTV World",         url: "https://feeds.feedburner.com/ndtvnews-world-news" },
       { name: "Euronews",           url: "https://www.euronews.com/rss?format=mrss&level=theme&name=news" },
+	  { name: "Ada Derana",      url: "https://www.adaderana.lk/rss.php" },
+	{ name: "Daily Mirror LK", url: "https://www.dailymirror.lk/rss.xml" },
+{ name: "Colombo Gazette", url: "https://colombogazette.com/feed/" },
+{ name: "NewsFirst LK",    url: "https://www.newsfirst.lk/feed/" },
+{ name: "Ceylon Today",    url: "https://ceylontoday.lk/feed/" },
     ];
 
     // Fetch all feeds in parallel using rss2json proxy + direct fallback
