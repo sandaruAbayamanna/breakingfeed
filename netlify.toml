@@ -46,3 +46,8 @@
   from = "/api/fb/photo"
   to = "/.netlify/functions/fb-photo"
   status = 200
+
+[[redirects]]
+  from = "/api/news/esana"
+  to = "/.netlify/functions/fetch-esana"
+  status = 200

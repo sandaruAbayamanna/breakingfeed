@@ -1113,7 +1113,7 @@ const LK_SOURCES_EN = new Set([
 ]);
 const LK_SOURCES_SI = new Set([
   'Ada Derana සිංහල','Hiru News සිංහල','Lankadeepa',
-  'Divaina','Mawbima','Silumina'
+  'Divaina','Mawbima','Silumina','Helakuru Esana'
 ]);
 const LK_SOURCES_TA = new Set(['Thinakkural','Virakesari']);
 
@@ -1509,16 +1509,36 @@ async function fetchNews(){
         ? { query: '', lkOnly: true, lkLang: 'si' }
         : { query: q };
 
-      if(isSinhalaTab) log('සිංහල mode — fetching all Sinhala sources (no keyword filter)…', 'inf');
+      if(isSinhalaTab) log('සිංහල mode — fetching Sinhala RSS + Helakuru Esana…', 'inf');
 
-      const res = await fetch('/api/news/rss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fetchBody)
-      });
-      const data = await res.json();
-      if(data.status !== 'ok') throw new Error(data.message || 'RSS fetch error');
-      rawArticles = data.articles || [];
+      // Fetch RSS and Esana in parallel when on Sinhala tab
+      const fetchPromises = [
+        fetch('/api/news/rss', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fetchBody)
+        }).then(r => r.json()).catch(() => ({ status: 'error', articles: [] }))
+      ];
+
+      if(isSinhalaTab) {
+        fetchPromises.push(
+          fetch('/api/news/esana', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          }).then(r => r.json()).catch(() => ({ status: 'error', articles: [] }))
+        );
+      }
+
+      const [rssData, esanaData] = await Promise.all(fetchPromises);
+      if(rssData.status !== 'ok' && !isSinhalaTab) throw new Error(rssData.message || 'RSS fetch error');
+
+      rawArticles = [
+        ...(rssData.articles || []),
+        ...(esanaData?.articles || [])
+      ];
+
+      if(isSinhalaTab) log(`Esana: ${esanaData?.articles?.length||0} posts, RSS: ${rssData?.articles?.length||0} articles`, 'inf');
 
     // ── API providers ──
     } else {
@@ -1604,10 +1624,12 @@ function renderFeed(){
             ${brk?'<span class="badge brk">⚡ BREAKING</span>':''}
             ${top?'<span class="badge top">🔥 TOP</span>':''}
             ${a.urlToImage?'<span class="badge vid">📷 MEDIA</span>':''}
+            ${a._esana?'<span class="badge" style="background:rgba(255,140,0,0.15);color:#ff8c00;border-color:rgba(255,140,0,0.4);">හෙළකුරු</span>':''}
             ${posted?'<span class="badge posted-badge">✓ POSTED</span>':''}
             <span class="badge src">${a.source.name}</span>
           </div>
           <div class="card-title">${cleanTitle(a.title)}</div>
+          ${a._esana && a.title_en ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-top:2px;line-height:1.4;">${a.title_en}</div>` : ''}
         </div>
       </div>
       <div class="card-body">
