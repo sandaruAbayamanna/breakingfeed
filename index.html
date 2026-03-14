@@ -711,6 +711,22 @@ select.inp{cursor:pointer;}
 .chip-btn:hover { border-color: var(--red); color: var(--text); }
 .chip-btn.active { border-color: var(--red); color: var(--red); background: rgba(220,38,38,0.08); }
 
+/* ── Video URL type indicator ── */
+.vid-indicator {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  line-height: 1.7;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid;
+}
+.vid-indicator b { font-size: 11px; display: block; margin-bottom: 2px; }
+.vid-indicator.yt  { background: rgba(255,60,60,0.12); border-color: rgba(255,60,60,0.4); color: #ff6b6b; }
+.vid-indicator.vim { background: rgba(26,183,234,0.12); border-color: rgba(26,183,234,0.4); color: #1ab7ea; }
+.vid-indicator.mp4 { background: rgba(45,214,113,0.12); border-color: rgba(45,214,113,0.4); color: #2DD671; }
+.vid-indicator.unk { background: rgba(255,173,51,0.12); border-color: rgba(255,173,51,0.4); color: #FFAD33; }
+.vid-indicator .tip { color: var(--muted2); font-size: 9px; margin-top: 4px; display: block; }
+
 </style>
 </head>
 <body>
@@ -1060,7 +1076,7 @@ select.inp{cursor:pointer;}
             <!-- Found videos list -->
             <div id="urlVideoResults" style="display:none;margin-bottom:8px;"></div>
             <!-- Upload mode indicator -->
-            <div id="videoUploadMode" style="font-family:'JetBrains Mono',monospace;font-size:9px;margin-top:4px;display:none;"></div>
+            <div id="videoUploadMode" style="display:none;margin-top:8px;"></div>
             <div id="videoUrlPrev" style="margin-top:6px;display:none;"></div>
           </div>
 
@@ -2974,50 +2990,41 @@ function selectUrlVideo(url, label, el) {
 function showVideoUploadMode(url) {
   const el = document.getElementById('videoUploadMode');
   if(!el) return;
-  const isYT  = url.includes('youtube.com') || url.includes('youtu.be');
-  const isVim = url.includes('vimeo.com');
-  const isDirect = /\.(mp4|webm|mov|avi|mkv)(\?|#|$)/i.test(url)
-                || url.includes('blob:')
-                || /\/video\?.*src=/i.test(url);
+
+  const isYT     = url.includes('youtube.com') || url.includes('youtu.be');
+  const isVim    = url.includes('vimeo.com');
+  const isDirect = /\.(mp4|webm|mov|avi|mkv)(\?|#|$)/i.test(url) || url.includes('blob:');
   const isStream = /\.(m3u8|ts|mpd)(\?|#|$)/i.test(url);
 
+  let cls, icon, title, body, tip = '';
+
   if(isYT) {
-    el.style.background = 'rgba(255,0,0,0.08)';
-    el.style.border = '1px solid rgba(255,0,0,0.3)';
-    el.style.borderRadius = '5px';
-    el.style.padding = '6px 8px';
-    el.style.color = '#ff4444';
-    el.innerHTML = `⚠️ <b>YouTube link detected</b><br>
-      YouTube blocks server downloads — this will post as an <b>embedded link</b> (viewers click to watch on YouTube).<br>
-      <span style="color:var(--green);">✓ To upload video directly, paste a .mp4 URL instead.</span>`;
+    cls   = 'yt';
+    icon  = '⚠️';
+    title = 'YouTube link';
+    body  = 'YouTube blocks server downloads. This will post as an <b>embedded link</b> — viewers tap to open YouTube.';
+    tip   = '💡 For a native FB video, paste a direct .mp4 URL instead';
   } else if(isVim) {
-    el.style.background = 'rgba(26,183,234,0.08)';
-    el.style.border = '1px solid rgba(26,183,234,0.3)';
-    el.style.borderRadius = '5px';
-    el.style.padding = '6px 8px';
-    el.style.color = '#1ab7ea';
-    el.innerHTML = `📘 <b>Vimeo link detected</b><br>Will post as embedded Vimeo link — Facebook plays it natively.`;
+    cls   = 'vim';
+    icon  = '📘';
+    title = 'Vimeo link';
+    body  = 'Will post as an embedded Vimeo link — Facebook plays it natively in the feed.';
   } else if(isDirect || isStream) {
-    el.style.background = 'rgba(34,197,94,0.08)';
-    el.style.border = '1px solid rgba(34,197,94,0.3)';
-    el.style.borderRadius = '5px';
-    el.style.padding = '6px 8px';
-    el.style.color = 'var(--green)';
-    el.innerHTML = `✅ <b>Direct video URL</b><br>Will be <b>downloaded & uploaded directly</b> to Facebook as a native video post.`;
+    cls   = 'mp4';
+    icon  = '✅';
+    title = 'Direct video file';
+    body  = 'Will be <b>downloaded & uploaded directly</b> to Facebook as a native video post.';
   } else {
-    el.style.background = 'rgba(255,165,0,0.08)';
-    el.style.border = '1px solid rgba(255,165,0,0.3)';
-    el.style.borderRadius = '5px';
-    el.style.padding = '6px 8px';
-    el.style.color = '#ff8c00';
-    el.innerHTML = `🔍 <b>Unknown URL type</b><br>Will attempt FB direct download. If that fails, URL will be posted as a link.<br>
-      <span style="font-size:9px;opacity:0.8;">Tip: Use a direct .mp4 URL for guaranteed video upload.</span>`;
+    cls   = 'unk';
+    icon  = '🔍';
+    title = 'Unknown URL type';
+    body  = 'Will attempt FB direct download then binary upload. Falls back to link post if both fail.';
+    tip   = '💡 Use a direct .mp4 URL for guaranteed upload';
   }
-  el.style.fontFamily = "'JetBrains Mono',monospace";
-  el.style.fontSize = '9px';
-  el.style.lineHeight = '1.6';
+
+  el.className = `vid-indicator ${cls}`;
+  el.innerHTML = `<b>${icon} ${title}</b>${body}${tip ? `<span class="tip">${tip}</span>` : ''}`;
   el.style.display = 'block';
-  el.style.marginTop = '6px';
 }
 
 function extractArticleImage() {
