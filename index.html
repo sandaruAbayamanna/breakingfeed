@@ -841,6 +841,15 @@ select.inp{cursor:pointer;}
         <span>Auto-post breaking</span>
         <button class="toggle" id="tgAutoPost" onclick="toggleAutoPost(this)"></button>
       </div>
+      <div class="toggle-row" style="border-top:1px solid rgba(255,140,0,0.2);padding-top:8px;margin-top:4px;">
+        <span style="color:#ff8c00;">🇱🇰 Sinhala auto-post</span>
+        <button class="toggle" id="tgSiAutoPost" onclick="toggleSiAutoPost(this)"></button>
+      </div>
+      <div id="siAutoStatus" style="display:none;font-family:'JetBrains Mono',monospace;font-size:8px;color:#ff8c00;margin-top:4px;padding:4px 6px;background:rgba(255,140,0,0.08);border-radius:4px;line-height:1.6;">
+        ⏱ Fetching every 2 min<br>
+        📡 Esana + Sinhala RSS<br>
+        <span id="siAutoTarget">📤 Target: —</span>
+      </div>
       <div class="toggle-row">
         <span>AI caption on fetch</span>
         <button class="toggle" id="tgAiAuto" onclick="this.classList.toggle('on')"></button>
@@ -1121,6 +1130,9 @@ let postedUrls = new Set();
 let totalPosted = 0;
 let autoRefreshTimer = null;
 let autoPostEnabled = false;
+let siAutoPostEnabled = false;
+let siAutoTimer = null;
+let siPostedUrls = new Set(); // track separately so SI posts don't interfere with main feed
 let postQueue = [];
 let currentTab = 'all';
 
@@ -2714,6 +2726,168 @@ function toggleAutoPost(btn){
   btn.classList.toggle('on');
   autoPostEnabled=btn.classList.contains('on');
   log(`Auto-post breaking: ${autoPostEnabled?'ON':'OFF'}`,autoPostEnabled?'warn':'inf');
+}
+
+// ══════════════════════════════════════════
+// SINHALA AUTO-POST SYSTEM
+// ══════════════════════════════════════════
+
+// Which account ID to use for Sinhala auto-post (set when toggled ON)
+let siAutoPageId = null;
+// Cutoff time — only post articles published AFTER this moment
+let siAutoCutoff = null;
+
+function toggleSiAutoPost(btn) {
+  btn.classList.toggle('on');
+  siAutoPostEnabled = btn.classList.contains('on');
+  const statusEl = document.getElementById('siAutoStatus');
+
+  if (siAutoPostEnabled) {
+    // Use the CURRENTLY ACTIVE account — whatever page is selected right now
+    const siPage = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+    if (!siPage) {
+      toast('Add a Facebook page first', 'err');
+      btn.classList.remove('on');
+      siAutoPostEnabled = false;
+      return;
+    }
+
+    // Lock in the target page and the cutoff time
+    siAutoPageId  = siPage.id;
+    siAutoCutoff  = new Date(); // only articles published from NOW onwards
+    siPostedUrls  = new Set();  // reset posted tracking
+
+    // Update status display
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      document.getElementById('siAutoTarget').textContent = `📤 Target: ${siPage.name}`;
+    }
+
+    log(`🇱🇰 Sinhala auto-post ON → ${siPage.name} (from ${siAutoCutoff.toLocaleTimeString()}, every 2 min)`, 'ok');
+    toast(`Sinhala auto-post ON → ${siPage.name}`, 'ok');
+
+    // First run after 2 min — don't post existing articles
+    siAutoTimer = setInterval(runSiAutoPost, 2 * 60 * 1000);
+
+  } else {
+    clearInterval(siAutoTimer);
+    siAutoTimer = null;
+    siAutoPageId = null;
+    siAutoCutoff = null;
+    if (statusEl) statusEl.style.display = 'none';
+    log('🇱🇰 Sinhala auto-post OFF', 'inf');
+    toast('Sinhala auto-post OFF', 'inf');
+  }
+}
+
+async function runSiAutoPost() {
+  if (!siAutoPostEnabled) return;
+
+  // Always use the page that was active when toggle was turned ON
+  const siPage = fbAccounts.find(a => a.id === siAutoPageId);
+  if (!siPage) { log('Sinhala auto-post: target page not found', 'err'); return; }
+
+  log('🇱🇰 Sinhala auto-fetch running…', 'inf');
+
+  try {
+    // Fetch Esana + Sinhala RSS in parallel
+    const [rssRes, esanaRes] = await Promise.all([
+      fetch('/api/news/rss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '', lkOnly: true, lkLang: 'si' })
+      }).then(r => r.json()).catch(() => ({ articles: [] })),
+
+      fetch('/api/news/esana', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      }).then(r => r.json()).catch(() => ({ articles: [] }))
+    ]);
+
+    const fresh = [
+      ...(esanaRes.articles || []),
+      ...(rssRes.articles   || [])
+    ].filter(a => {
+      if (siPostedUrls.has(a.url)) return false;
+      // Only post articles published AFTER the toggle was turned ON
+      if (siAutoCutoff && new Date(a.publishedAt) < siAutoCutoff) return false;
+      return true;
+    });
+
+    if (!fresh.length) {
+      log('🇱🇰 Sinhala auto-post: no new articles', 'inf');
+      return;
+    }
+
+    log(`🇱🇰 ${fresh.length} new Sinhala article(s) found — posting to ${siPage.name}…`, 'warn');
+
+    const delay = parseInt(document.getElementById('postInterval')?.value || '0') * 60 * 1000;
+
+    for (let idx = 0; idx < fresh.length; idx++) {
+      const a = fresh[idx];
+
+      // Mark as posted immediately to prevent double-post on next cycle
+      siPostedUrls.add(a.url);
+
+      // Delay between posts if configured
+      if (idx > 0 && delay > 0) {
+        log(`⏳ Waiting ${delay/60000} min before next post…`, 'inf');
+        await new Promise(res => setTimeout(res, delay));
+      }
+
+      if (!siAutoPostEnabled) break; // user turned it off mid-queue
+
+      try {
+        const cap = buildEsanaCaption(a);
+        const fbToken  = siPage.token.replace(/\s+/g, '');
+        const fbPageId = siPage.pageId.trim();
+
+        log(`📤 Auto-posting: "${a.title.slice(0, 40)}…"`, 'inf');
+
+        // Use image post if article has thumbnail (Esana always does)
+        if (a.urlToImage) {
+          const res = await fetch('/api/fb/photo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pageId: fbPageId,
+              access_token: fbToken,
+              caption: cap,
+              image_url: a.urlToImage
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error.message);
+          log(`✓ Auto-posted with image: "${a.title.slice(0, 35)}…"`, 'ok');
+        } else {
+          // No image — text post
+          const res = await fetch('/api/fb/post', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pageId: fbPageId,
+              message: cap,
+              access_token: fbToken
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error.message);
+          log(`✓ Auto-posted: "${a.title.slice(0, 35)}…"`, 'ok');
+        }
+
+        addToQueue(a.title, 'AUTO', 'ok');
+
+      } catch(err) {
+        log(`✗ Auto-post failed: ${err.message}`, 'err');
+        // Remove from siPostedUrls so it retries next cycle
+        siPostedUrls.delete(a.url);
+      }
+    }
+
+  } catch(err) {
+    log(`🇱🇰 Sinhala auto-fetch error: ${err.message}`, 'err');
+  }
 }
 
 // ── Quick topic keyword preset helper ──
