@@ -18,11 +18,11 @@ exports.handler = async function (event) {
   const headers = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
 
   try {
-    const { query } = JSON.parse(event.body || "{}");
+    const { query, lkOnly, lkLang } = JSON.parse(event.body || "{}");
 
     // ── RSS FEEDS — tested reliable sources ──
     const RSS_FEEDS = [
-      // These work reliably server-side
+      // ── INTERNATIONAL ──
       { name: "BBC World",          url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
       { name: "BBC Top Stories",    url: "https://feeds.bbci.co.uk/news/rss.xml" },
       { name: "Al Jazeera",         url: "https://www.aljazeera.com/xml/rss/all.xml" },
@@ -38,16 +38,65 @@ exports.handler = async function (event) {
       { name: "Times of India",     url: "https://timesofindia.indiatimes.com/rssfeeds/296589292.cms" },
       { name: "NDTV World",         url: "https://feeds.feedburner.com/ndtvnews-world-news" },
       { name: "Euronews",           url: "https://www.euronews.com/rss?format=mrss&level=theme&name=news" },
-	  { name: "Ada Derana",      url: "https://www.adaderana.lk/rss.php" },
-	{ name: "Daily Mirror LK", url: "https://www.dailymirror.lk/rss.xml" },
-{ name: "Colombo Gazette", url: "https://colombogazette.com/feed/" },
-{ name: "NewsFirst LK",    url: "https://www.newsfirst.lk/feed/" },
-{ name: "Ceylon Today",    url: "https://ceylontoday.lk/feed/" },
+
+      // ── SRI LANKA — English ──
+      { name: "Daily Mirror LK",    url: "https://www.dailymirror.lk/rss.xml" },
+      { name: "Daily FT",           url: "https://www.ft.lk/rss.xml" },
+      { name: "The Morning LK",     url: "https://www.themorning.lk/feed/" },
+      { name: "Ceylon Today",       url: "https://ceylontoday.lk/feed/" },
+      { name: "NewsFirst LK",       url: "https://www.newsfirst.lk/feed/" },
+      { name: "Ada Derana English", url: "https://www.adaderana.lk/rss.php" },
+      { name: "Hiru News English",  url: "https://www.hirunews.lk/english/rss.xml" },
+      { name: "Sunday Times LK",    url: "https://www.sundaytimes.lk/feed/" },
+      { name: "Island Online",      url: "https://island.lk/feed/" },
+      { name: "Economy Next",       url: "https://economynext.com/feed/" },
+      { name: "Colombo Gazette",    url: "https://colombogazette.com/feed/" },
+      { name: "Lanka Business",     url: "https://www.lankabusinessonline.com/feed/" },
+
+      // ── SRI LANKA — Sinhala ──
+      { name: "Ada Derana සිංහල",  url: "https://sinhala.adaderana.lk/rss.php" },
+      { name: "Hiru News සිංහල",   url: "https://www.hirunews.lk/sinhala/rss.xml" },
+      { name: "Lankadeepa",         url: "https://www.lankadeepa.lk/rss.xml" },
+      { name: "Divaina",            url: "https://www.divaina.lk/rss.xml" },
+      { name: "Mawbima",            url: "https://www.mawbima.lk/rss.xml" },
+      { name: "Silumina",           url: "https://www.silumina.lk/rss.xml" },
+
+      // ── SRI LANKA — Tamil ──
+      { name: "Thinakkural",        url: "https://www.thinakkural.lk/feed/" },
+      { name: "Virakesari",         url: "https://www.virakesari.lk/feed/" },
+
+      // ── SRI LANKA — Extra verified feeds ──
+      { name: "LankaWeb",           url: "https://www.lankaweb.com/news/feed/" },
+      { name: "NewsWire LK",        url: "https://www.newswire.lk/feed/" },
+      { name: "Ceylon News",        url: "https://ceylonnews.net/feed/" },
     ];
 
     // Fetch all feeds in parallel using rss2json proxy + direct fallback
+    // Sinhala-only sources
+    const SI_SOURCES = ['Ada Derana සිංහල','Hiru News සිංහල','Lankadeepa','Divaina','Mawbima','Silumina'];
+
+    // Select which feeds to fetch
+    let feedsToFetch;
+    if(lkLang === 'si') {
+      // Only Sinhala sources — guaranteed to have Sinhala content
+      feedsToFetch = RSS_FEEDS.filter(f => SI_SOURCES.includes(f.name));
+    } else if(lkOnly) {
+      feedsToFetch = RSS_FEEDS.filter(f => f.name.includes('LK') || f.name.includes('Lanka') || 
+          f.name.includes('Ceylon') || f.name.includes('Derana') || 
+          f.name.includes('Hiru') || f.name.includes('Lankadeepa') ||
+          f.name.includes('Divaina') || f.name.includes('Mawbima') ||
+          f.name.includes('Silumina') || f.name.includes('Thinakkural') ||
+          f.name.includes('Virakesari') || f.name.includes('Sunday Times') ||
+          f.name.includes('Island') || f.name.includes('Morning') ||
+          f.name.includes('NewsWire') || f.name.includes('LankaWeb') ||
+          f.name.includes('Colombo') || f.name.includes('Economy Next') ||
+          f.name.includes('සිංහල') || f.name.includes('NewsFirst'));
+    } else {
+      feedsToFetch = RSS_FEEDS;
+    }
+
     const results = await Promise.allSettled(
-      RSS_FEEDS.map(feed => fetchWithFallback(feed))
+      feedsToFetch.map(feed => fetchWithFallback(feed))
     );
 
     let allArticles = [];
@@ -61,8 +110,8 @@ exports.handler = async function (event) {
 
     console.log(`[RSS] ${successCount}/${RSS_FEEDS.length} feeds OK, ${allArticles.length} raw articles`);
 
-    // Filter by query keywords
-    if (query && query.trim()) {
+    // Filter by query keywords — skip for Sinhala sources (text won't match English keywords)
+    if (!lkLang && query && query.trim()) {
       const keywords = query.toLowerCase()
         .split(/\s+OR\s+|\s*,\s*/)
         .map(k => k.trim().replace(/^"|"$/g, ''))
@@ -93,7 +142,7 @@ exports.handler = async function (event) {
       body: JSON.stringify({ 
         status: "ok", 
         totalResults: deduped.length, 
-        articles: deduped.slice(0, 60),
+        articles: deduped.slice(0, 100),
         meta: { feedsOk: successCount, feedsTotal: RSS_FEEDS.length }
       }),
     };

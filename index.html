@@ -698,6 +698,19 @@ select.inp{cursor:pointer;}
   .fb-mock { display: none !important; }
 }
 
+/* ── Quick topic chip buttons ── */
+.chip-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; letter-spacing: 0.5px;
+  padding: 4px 8px; border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: var(--card); color: var(--muted);
+  cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.chip-btn:hover { border-color: var(--red); color: var(--text); }
+.chip-btn.active { border-color: var(--red); color: var(--red); background: rgba(220,38,38,0.08); }
+
 </style>
 </head>
 <body>
@@ -738,6 +751,16 @@ select.inp{cursor:pointer;}
         <input class="inp" type="password" id="newsKey" placeholder="API key for selected source…" />
       </div>
       <div id="apiHint" style="font-size:10px;color:var(--green);font-family:'JetBrains Mono',monospace;margin-top:-4px;margin-bottom:6px;line-height:1.5;"></div>
+      <!-- Quick keyword presets -->
+      <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:5px;">QUICK TOPICS</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">
+        <button class="chip-btn" onclick="setKeyword('Sri Lanka')">🇱🇰 Sri Lanka</button>
+        <button class="chip-btn" onclick="setKeyword('war')">⚔️ War</button>
+        <button class="chip-btn" onclick="setKeyword('Gaza')">🕊 Gaza</button>
+        <button class="chip-btn" onclick="setKeyword('Ukraine')">🇺🇦 Ukraine</button>
+        <button class="chip-btn" onclick="setKeyword('economy')">💰 Economy</button>
+        <button class="chip-btn" onclick="setKeyword('')">📡 All News</button>
+      </div>
     </div>
 
     <div class="sb-section" id="fbAccountsSection">
@@ -857,6 +880,8 @@ select.inp{cursor:pointer;}
         <button class="ftab on" onclick="setTab('all',this)">ALL</button>
         <button class="ftab" onclick="setTab('breaking',this)">🚨 BREAKING</button>
         <button class="ftab" onclick="setTab('top',this)">🔥 TOP</button>
+        <button class="ftab" onclick="setTab('lk',this)">🇱🇰 SRI LANKA</button>
+        <button class="ftab" onclick="setTab('lk_si',this)">🇱🇰 සිංහල</button>
         <button class="ftab" onclick="setTab('video',this)">📹 MEDIA</button>
         <button class="ftab" onclick="setTab('unposted',this)">⏳ UNPOSTED</button>
       </div>
@@ -1078,6 +1103,19 @@ let autoRefreshTimer = null;
 let autoPostEnabled = false;
 let postQueue = [];
 let currentTab = 'all';
+
+// ── Sri Lanka source name sets (must match RSS feed names in fetch-rss.js) ──
+const LK_SOURCES_EN = new Set([
+  'Daily Mirror LK','Daily FT','The Morning LK','Ceylon Today',
+  'NewsFirst LK','Ada Derana English','Hiru News English',
+  'Sunday Times LK','Island Online','Economy Next',
+  'Colombo Gazette','Lanka Business'
+]);
+const LK_SOURCES_SI = new Set([
+  'Ada Derana සිංහල','Hiru News සිංහල','Lankadeepa',
+  'Divaina','Mawbima','Silumina'
+]);
+const LK_SOURCES_TA = new Set(['Thinakkural','Virakesari']);
 
 // ══════════════════════════════════════════
 // MULTI-ACCOUNT FACEBOOK MANAGER
@@ -1465,10 +1503,18 @@ async function fetchNews(){
 
     // ── RSS: no API key, zero delay ──
     if(provider === 'rss') {
+      // Sinhala tab: fetch ALL news from LK Sinhala sources, no keyword filter
+      const isSinhalaTab = currentTab === 'lk_si';
+      const fetchBody = isSinhalaTab
+        ? { query: '', lkOnly: true, lkLang: 'si' }
+        : { query: q };
+
+      if(isSinhalaTab) log('සිංහල mode — fetching all Sinhala sources (no keyword filter)…', 'inf');
+
       const res = await fetch('/api/news/rss', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q })
+        body: JSON.stringify(fetchBody)
       });
       const data = await res.json();
       if(data.status !== 'ok') throw new Error(data.message || 'RSS fetch error');
@@ -1535,6 +1581,8 @@ function renderFeed(){
   else if(currentTab==='top') arts=arts.filter(a=>a._top||isTop(a));
   else if(currentTab==='video') arts=arts.filter(hasMedia);
   else if(currentTab==='unposted') arts=arts.filter(a=>!postedUrls.has(a.url));
+  else if(currentTab==='lk') arts=arts.filter(a=>LK_SOURCES_EN.has(a.source?.name));
+  else if(currentTab==='lk_si') arts=arts.filter(a=>LK_SOURCES_SI.has(a.source?.name));
 
   if(!arts.length){
     document.getElementById('feedEl').innerHTML=`<div class="empty"><div class="empty-icon">🔍</div><div class="empty-ttl">NO RESULTS</div><div class="empty-sub">Try a different filter or search term</div></div>`;
@@ -1579,6 +1627,14 @@ function renderFeed(){
 
 function setTab(tab,btn){
   currentTab=tab;
+  // Update feed title
+  const titles = {all:'GLOBAL FEED',breaking:'🚨 BREAKING NEWS',top:'🔥 TOP STORIES',
+    lk:'🇱🇰 SRI LANKA NEWS (English)',lk_si:'🇱🇰 ශ්‍රී ලංකා පුවත් (සිංහල)',
+    video:'📹 MEDIA FEED',unposted:'⏳ UNPOSTED'};
+  const titleEl = document.querySelector('.feed-bar-title');
+  if(titleEl) titleEl.textContent = titles[tab] || 'FEED';
+  // Auto-fetch when switching to Sinhala tab so it loads with no keyword
+  if(tab === 'lk_si') fetchNews();
   document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
   if(articles.length) renderFeed();
@@ -2467,6 +2523,18 @@ function toggleAutoPost(btn){
   btn.classList.toggle('on');
   autoPostEnabled=btn.classList.contains('on');
   log(`Auto-post breaking: ${autoPostEnabled?'ON':'OFF'}`,autoPostEnabled?'warn':'inf');
+}
+
+// ── Quick topic keyword preset helper ──
+function setKeyword(kw) {
+  const qEl = document.getElementById('newsQuery');
+  if(qEl) qEl.value = kw;
+  // Highlight active chip
+  document.querySelectorAll('.chip-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.includes(kw) && kw !== '');
+  });
+  // Auto-fetch
+  fetchNews();
 }
 
 // ══════════════════════════════════════════
