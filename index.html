@@ -2239,6 +2239,33 @@ async function aiCaption(articleIdx){
   const a=articles[i];
   const btn=document.getElementById('aiBtn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Generating…';}
+
+  // ── Esana articles: use rich local builder, skip API call ──
+  if(a._esana) {
+    const cap = buildEsanaCaption(a);
+    if(i===selIdx) {
+      document.getElementById('captionBox').value = cap;
+      syncPreview();
+      // Re-apply Image post type — API call previously could have reset it
+      const imgBtn = document.getElementById('ptImage');
+      if(imgBtn) setPostType('image', imgBtn);
+      // Re-show preview panel
+      showEsanaPreview(a);
+      // Re-load image
+      if(a.urlToImage) {
+        document.getElementById('imageUrl').value = a.urlToImage;
+        previewImageUrl();
+        const modeEl = document.getElementById('imageUploadMode');
+        if(modeEl){ modeEl.style.display='block'; modeEl.textContent='✓ Article image will be uploaded directly to Facebook'; }
+      }
+    }
+    log('Rich Esana caption applied ✓','ok');
+    toast('Rich Esana post ready ✓','ok');
+    if(btn){btn.disabled=false;btn.textContent='✨ Auto Caption';}
+    return cap;
+  }
+
+  // ── Standard articles: call AI caption API ──
   log(`Generating caption for: "${a.title.slice(0,40)}…"`,'inf');
   try{
     const res=await fetch('/api/ai-caption',{
@@ -2299,7 +2326,9 @@ async function postToFB(articleIdx, caption, injectedAcc){
       cap = buildCaption(a);
     }
   }
-  const postType = articleIdx===selIdx ? currentPostType : 'text';
+  // Esana articles always post as image (photo upload) regardless of currentPostType
+  let postType = articleIdx===selIdx ? currentPostType : 'text';
+  if(a._esana && postType === 'text') postType = 'image';
 
   log(`Posting [${postType}]: "${a.title.slice(0,35)}…"`, 'inf');
 
@@ -2310,7 +2339,10 @@ async function postToFB(articleIdx, caption, injectedAcc){
 
   // ── IMAGE POST ──
   if(postType==='image'){
-    const imgUrl = document.getElementById('imageUrl').value.trim() || a.urlToImage || '';
+    // For Esana always use article thumbnail
+    const imgUrl = a._esana
+      ? (a.urlToImage || document.getElementById('imageUrl').value.trim() || '')
+      : (document.getElementById('imageUrl').value.trim() || a.urlToImage || '');
     try{
       if(imgUrl){
         // ── Direct image upload to Facebook /photos ──
