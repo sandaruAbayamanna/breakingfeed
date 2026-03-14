@@ -1,6 +1,6 @@
 // fetch-esana.js — Helakuru Esana news
-// The helakuru.lk/EsanaV3 endpoint is now Cloudflare-protected and blocks server requests.
-// We use community-built proxies as the primary sources.
+// Primary: esana-api.vercel.app/EsanaV3 (Damantha126's proxy — GET request)
+// Fallbacks: multiple methods
 
 exports.handler = async function (event) {
   if (event.httpMethod === "OPTIONS") {
@@ -10,10 +10,10 @@ exports.handler = async function (event) {
 
   function extractPosts(data) {
     if (!data) return [];
-    if (Array.isArray(data.Posts)          && data.Posts.length)           return data.Posts;
-    if (data.news_data?.data?.length)                                       return data.news_data.data;
-    if (Array.isArray(data.data)           && data.data.length)             return data.data;
-    if (Array.isArray(data)                && data.length)                  return data;
+    if (Array.isArray(data.Posts) && data.Posts.length)        return data.Posts;
+    if (data.news_data?.data?.length)                          return data.news_data.data;
+    if (Array.isArray(data.data) && data.data.length)          return data.data;
+    if (Array.isArray(data) && data.length && data[0]?.title)  return data;
     return [];
   }
 
@@ -22,15 +22,13 @@ exports.handler = async function (event) {
       const siDesc = (p.content||[]).filter(c=>c.data&&typeof c.data==="string").map(c=>c.data).join(" ").slice(0,220).trim();
       const enDesc = (p.content||[]).filter(c=>c.data_en&&typeof c.data_en==="string").map(c=>c.data_en).join(" ").slice(0,220).trim();
       let publishedAt;
-      try {
-        const raw = p.published || p.date || "";
-        publishedAt = raw ? new Date(raw.replace(" ","T")+"+05:30").toISOString() : new Date().toISOString();
-      } catch { publishedAt = new Date().toISOString(); }
+      try { publishedAt = new Date((p.published||p.date||"").replace(" ","T")+"+05:30").toISOString(); }
+      catch { publishedAt = new Date().toISOString(); }
       return {
         title:       p.title || p.title_si || p.title_en || "Untitled",
         title_en:    p.title_en || p.title_e || "",
         description: siDesc || enDesc || p.description || "",
-        url:         p.link || p.url || p.share_url || `https://www.helakuru.lk/esana/news/${p.id}`,
+        url:         p.link || p.url || `https://www.helakuru.lk/esana/news/${p.id}`,
         urlToImage:  p.thumb || p.thumbnail || p.cover || p.image || null,
         publishedAt,
         source: { id: "helakuru-esana", name: "Helakuru Esana" },
@@ -39,60 +37,50 @@ exports.handler = async function (event) {
     }).filter(a => a.title && a.url);
   }
 
+  // All GET requests
   const ATTEMPTS = [
-    // 1. Damantha126 Vercel proxy (live, updated in real-time)
-    { label: "damantha-vercel",
-      url: "https://esana-api.vercel.app/api/news",
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } },
+    // 1. Damantha126 Vercel proxy — correct route is /EsanaV3 (GET)
+    { label: "damantha-EsanaV3",
+      url: "https://esana-api.vercel.app/EsanaV3" },
 
-    // 2. Damantha126 Vercel root
-    { label: "damantha-vercel-root",
-      url: "https://esana-api.vercel.app/",
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } },
+    // 2. Damantha126 without path (may redirect)
+    { label: "damantha-root",
+      url: "https://esana-api.vercel.app" },
 
-    // 3. ThaminduDisnaZ GitHub raw (cached hourly by GitHub Actions)
-    { label: "thamindu-raw",
-      url: "https://raw.githubusercontent.com/ThaminduDisnaZ/Esena-News-Github-Bot/main/news.json",
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json", "Cache-Control": "no-cache" } },
-
-    // 4. Direct API with Android app User-Agent (most likely to bypass Cloudflare)
+    // 3. Direct helakuru with Android app headers
     { label: "direct-android",
       url: "https://www.helakuru.lk/EsanaV3",
       headers: {
         "User-Agent": "Dalvik/2.1.0 (Linux; U; Android 13; Pixel 7 Build/TQ3A.230901.001)",
         "Accept": "application/json",
-        "Accept-Language": "si-LK,si;q=0.9",
         "X-Requested-With": "lk.bhasha.helakuru",
-        "Connection": "keep-alive",
       }},
 
-    // 5. Direct API with iOS app User-Agent
-    { label: "direct-ios",
-      url: "https://www.helakuru.lk/EsanaV3",
-      headers: {
-        "User-Agent": "Helakuru/12.2.5 CFNetwork/1498.700.2 Darwin/23.6.0",
-        "Accept": "application/json",
-        "Accept-Language": "si-LK",
-      }},
+    // 4. ThaminduDisnaZ GitHub raw cached file
+    { label: "thamindu-github-raw",
+      url: "https://raw.githubusercontent.com/ThaminduDisnaZ/Esena-News-Github-Bot/main/news.json" },
 
-    // 6. allorigins wrapping direct
+    // 5. allorigins wrapping direct
     { label: "allorigins",
       url: `https://api.allorigins.win/get?url=${encodeURIComponent("https://www.helakuru.lk/EsanaV3")}`,
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" },
       unwrap: true },
 
-    // 7. corsproxy.io
+    // 6. corsproxy.io
     { label: "corsproxy",
-      url: `https://corsproxy.io/?${encodeURIComponent("https://www.helakuru.lk/EsanaV3")}`,
-      headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" } },
+      url: `https://corsproxy.io/?${encodeURIComponent("https://www.helakuru.lk/EsanaV3")}` },
   ];
 
   for (const ep of ATTEMPTS) {
     try {
-      console.log(`[esana] Trying ${ep.label}…`);
+      console.log(`[esana] Trying ${ep.label}: ${ep.url}`);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 12000);
-      const res = await fetch(ep.url, { signal: controller.signal, headers: ep.headers || {} });
+
+      const res = await fetch(ep.url, {
+        method: "GET",
+        signal: controller.signal,
+        headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json", ...(ep.headers||{}) },
+      });
       clearTimeout(timer);
 
       if (!res.ok) { console.log(`[esana] ${ep.label} HTTP ${res.status}`); continue; }
@@ -102,10 +90,7 @@ exports.handler = async function (event) {
       try {
         const parsed = JSON.parse(text);
         json = ep.unwrap ? JSON.parse(parsed.contents) : parsed;
-      } catch(e) {
-        console.log(`[esana] ${ep.label} JSON parse failed: ${e.message}`);
-        continue;
-      }
+      } catch(e) { console.log(`[esana] ${ep.label} parse error: ${e.message}`); continue; }
 
       const posts = extractPosts(json);
       if (!posts.length) { console.log(`[esana] ${ep.label} — 0 posts`); continue; }
@@ -125,6 +110,6 @@ exports.handler = async function (event) {
 
   return {
     statusCode: 200, headers,
-    body: JSON.stringify({ status:"error", message:"All Esana methods failed — Helakuru API is fully blocked", articles:[] })
+    body: JSON.stringify({ status:"error", message:"Helakuru Esana API unavailable — all methods failed", articles:[] })
   };
 };
