@@ -2544,19 +2544,22 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
     }
   }
 
-  // ── All other videos: ALWAYS download + direct binary upload to Facebook ──
-  log('📥 Downloading video then uploading directly to Facebook…', 'inf');
-  showProgress(10, '📥 Downloading video…');
+  // ── All other videos: download + binary upload via Netlify function ──
+  log('📥 Sending video URL to server — trying FB direct download then binary upload…', 'inf');
+  showProgress(10, '🔗 Sending to Facebook…');
 
-  // Animate progress bar during long operation
+  // Animate progress — stages reflect the two strategies in fb-video.js
   let fakePct = 10;
   const timer = setInterval(() => {
-    if(fakePct < 85) {
-      fakePct += fakePct < 40 ? 4 : fakePct < 65 ? 2 : 0.6;
-      const stage = fakePct < 45 ? '📥 Downloading video…' : fakePct < 75 ? '📤 Uploading to Facebook…' : '⏳ Finalizing…';
+    if(fakePct < 88) {
+      fakePct += fakePct < 30 ? 5 : fakePct < 55 ? 3 : fakePct < 75 ? 1.5 : 0.5;
+      const stage = fakePct < 30 ? '🔗 Strategy 1: FB direct download…'
+                  : fakePct < 60 ? '📥 Strategy 2: Downloading binary…'
+                  : fakePct < 80 ? '📤 Uploading to Facebook…'
+                  : '⏳ Finalizing…';
       showProgress(Math.round(fakePct), stage);
     }
-  }, 1000);
+  }, 1200);
 
   try {
     const res = await fetch('/api/fb/video', {
@@ -2597,11 +2600,12 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
       return true;
     }
 
-    const sizeTxt = data.fileSizeMB ? ` (${data.fileSizeMB}MB)` : '';
+    const sizeTxt   = data.fileSizeMB ? ` (${data.fileSizeMB}MB)` : '';
+    const methodTxt  = data.method ? ` via ${data.method}` : '';
     showProgress(100, `✓ Video uploaded${sizeTxt}!`);
     setTimeout(hideProgress, 3000);
     markPosted(a, data.id || data.video_id, articleIdx);
-    log(`✓ Video uploaded directly to Facebook${sizeTxt}`, 'ok');
+    log(`✓ Video posted to Facebook${sizeTxt}${methodTxt}`, 'ok');
     return true;
 
   } catch(err) {
