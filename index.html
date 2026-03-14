@@ -917,6 +917,26 @@ select.inp{cursor:pointer;}
       </div>
 
       <div>
+        <!-- Esana rich preview (shown only for Esana articles) -->
+        <div id="esanaPreviewWrap" style="display:none;margin-bottom:12px;background:var(--card);border:1px solid rgba(255,140,0,0.35);border-radius:8px;overflow:hidden;">
+          <div style="padding:10px 12px 8px;border-bottom:1px solid rgba(255,140,0,0.2);display:flex;align-items:center;gap:8px;">
+            <span style="font-size:16px;">📰</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#ff8c00;letter-spacing:2px;font-weight:700;">හෙළකුරු එසැණ — RICH POST PREVIEW</span>
+          </div>
+          <div id="esanaThumbWrap" style="display:none;">
+            <img id="esanaThumbImg" style="width:100%;max-height:180px;object-fit:cover;display:block;" />
+          </div>
+          <div style="padding:10px 12px;">
+            <div id="esanaTitlePrev" style="font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:var(--text);line-height:1.5;margin-bottom:3px;"></div>
+            <div id="esanaTitleEnPrev" style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#ff8c00;margin-bottom:10px;font-style:italic;"></div>
+            <div id="esanaBodyPrev" style="font-family:'Syne',sans-serif;font-size:11px;color:var(--muted);line-height:1.8;max-height:140px;overflow-y:auto;border-left:2px solid rgba(255,140,0,0.3);padding-left:8px;"></div>
+            <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <span id="esanaDatePrev" style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);"></span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);">📡 Helakuru Esana</span>
+            </div>
+          </div>
+        </div>
+
         <div class="field-label">POST CAPTION & LANGUAGE</div>
 
         <!-- Language selector -->
@@ -1713,10 +1733,27 @@ function selectArt(i){
   const langEnBtn = document.getElementById('langEn');
   if(langEnBtn) setLang('en', langEnBtn);
 
-  // Reset post type to text+link on new selection
-  setPostType('text', document.getElementById('ptText'));
+  // Esana: auto-switch to Image post with rich caption; others: default text
+  if(a._esana) {
+    setPostType('image', document.getElementById('ptImage'));
+    document.getElementById('imageUrl').value = a.urlToImage||'';
+    if(a.urlToImage) {
+      setTimeout(() => {
+        previewImageUrl();
+        const modeEl = document.getElementById('imageUploadMode');
+        if(modeEl){ modeEl.style.display='block'; modeEl.textContent='✓ Article image will be uploaded directly to Facebook'; }
+      }, 50);
+    }
+    // Show Esana rich preview panel
+    showEsanaPreview(a);
+  } else {
+    setPostType('text', document.getElementById('ptText'));
+    document.getElementById('imageUrl').value = a.urlToImage||'';
+    // Hide Esana preview panel
+    const ep = document.getElementById('esanaPreviewWrap');
+    if(ep) ep.style.display = 'none';
+  }
   document.getElementById('mediaUrl').value = a.url||'';
-  document.getElementById('imageUrl').value = a.urlToImage||'';
   document.getElementById('videoUrl').value = '';
   document.getElementById('videoTitle').value = '';
   clearVideoFile();
@@ -1743,9 +1780,97 @@ function selectArt(i){
 }
 
 function buildCaption(a){
+  if(a._esana) return buildEsanaCaption(a);
   const brk=isBreaking(a);
   const emoji=brk?'🚨':'📰';
   return `${emoji} ${cleanTitle(a.title)}\n\n${a.description||''}\n\n📍 ${a.source.name}  |  ${new Date(a.publishedAt).toUTCString().slice(0,22)}\n🔗 ${a.url}\n\n#BreakingNews #WorldNews #${a.source.name.replace(/\s+/g,'')}`;
+}
+
+// ── Populate Esana rich preview panel ──
+function showEsanaPreview(a) {
+  const wrap = document.getElementById('esanaPreviewWrap');
+  if(!wrap) return;
+  wrap.style.display = 'block';
+
+  // Thumbnail
+  const thumbWrap = document.getElementById('esanaThumbWrap');
+  const thumbImg  = document.getElementById('esanaThumbImg');
+  if(a.urlToImage && thumbWrap && thumbImg) {
+    thumbImg.src = a.urlToImage;
+    thumbImg.onerror = () => { thumbWrap.style.display='none'; };
+    thumbWrap.style.display = 'block';
+  } else if(thumbWrap) {
+    thumbWrap.style.display = 'none';
+  }
+
+  // Titles
+  const titleEl   = document.getElementById('esanaTitlePrev');
+  const titleEnEl = document.getElementById('esanaTitleEnPrev');
+  if(titleEl)   titleEl.textContent   = a.title || '';
+  if(titleEnEl) titleEnEl.textContent = a.title_en ? `( ${a.title_en} )` : '';
+
+  // Body paragraphs
+  const bodyEl = document.getElementById('esanaBodyPrev');
+  if(bodyEl) {
+    const paras = a._textBlocks || (a.description ? [a.description] : []);
+    if(paras.length) {
+      bodyEl.innerHTML = paras.map(p =>
+        `<p style="margin:0 0 10px;">${p}</p>`
+      ).join('');
+    } else {
+      bodyEl.innerHTML = '<p style="margin:0;color:var(--muted2);font-size:10px;">No content available</p>';
+    }
+  }
+
+  // Date
+  const dateEl = document.getElementById('esanaDatePrev');
+  if(dateEl) {
+    try {
+      dateEl.textContent = '🕐 ' + new Date(a.publishedAt).toLocaleString('si-LK', {
+        timeZone: 'Asia/Colombo',
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch { dateEl.textContent = ''; }
+  }
+}
+
+// ── Rich Sinhala post builder for Helakuru Esana articles ──
+function buildEsanaCaption(a) {
+  const lines = [];
+
+  // Title in Sinhala (large, prominent)
+  lines.push(`📰 ${a.title}`);
+
+  // English title as subtitle if available
+  if(a.title_en) lines.push(`   (${a.title_en})`);
+
+  lines.push('');
+
+  // Full article paragraphs
+  const paras = a._textBlocks || [];
+  if(paras.length) {
+    paras.forEach(p => {
+      lines.push(p);
+      lines.push('');
+    });
+  } else if(a.description) {
+    lines.push(a.description);
+    lines.push('');
+  }
+
+  // Date formatted in a readable way
+  const dt = new Date(a.publishedAt);
+  const dateStr = dt.toLocaleDateString('si-LK', {
+    year:'numeric', month:'long', day:'numeric',
+    hour:'2-digit', minute:'2-digit', timeZone:'Asia/Colombo'
+  });
+  lines.push(`🕐 ${dateStr}`);
+  lines.push(`📡 හෙළකුරු එසැණ`);
+  lines.push('');
+  lines.push(`#ශ්‍රීලංකා #SriLanka #හෙළකුරු #EsanaNews #BreakingNewsSL`);
+
+  return lines.join('\n');
 }
 
 // ══════════════════════════════════════════

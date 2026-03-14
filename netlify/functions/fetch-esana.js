@@ -12,10 +12,19 @@ exports.handler = async function (event) {
   // ── Normalise to BreakingFeed article format ──
   function normalise(posts) {
     return posts.map(p => {
-      // contentSi is an array of objects — extract text blocks
-      const siDesc = (p.contentSi || [])
+      // Extract all text paragraphs from contentSi
+      const textBlocks = (p.contentSi || [])
         .filter(c => c.type === "text" && c.data)
-        .map(c => c.data).join(" ").slice(0, 220).trim();
+        .map(c => c.data.trim())
+        .filter(Boolean);
+
+      // Extract all images from contentSi (type=image, url field)
+      const contentImages = (p.contentSi || [])
+        .filter(c => c.type === "image" && (c.url || c.data))
+        .map(c => c.url || c.data)
+        .filter(Boolean);
+
+      const siDesc = textBlocks.join(" ").slice(0, 220).trim();
 
       let publishedAt;
       try {
@@ -23,16 +32,18 @@ exports.handler = async function (event) {
       } catch { publishedAt = new Date().toISOString(); }
 
       return {
-        title:       p.titleSi || p.titleEn || "Untitled",
-        title_en:    p.titleEn || "",
-        description: siDesc || "",
-        url:         p.share_url || `https://www.helakuru.lk/esana/news/${p.id}`,
-        urlToImage:  p.thumb || p.cover || null,
+        title:         p.titleSi || p.titleEn || "Untitled",
+        title_en:      p.titleEn || "",
+        description:   siDesc || "",
+        url:           p.share_url || `https://www.helakuru.lk/esana/news/${p.id}`,
+        urlToImage:    p.thumb || p.cover || contentImages[0] || null,
         publishedAt,
         source: { id: "helakuru-esana", name: "Helakuru Esana" },
-        _esana: true,
-        _likes:    p.reactions?.like || 0,
-        _comments: p.comments || 0,
+        _esana:        true,
+        _textBlocks:   textBlocks,        // full paragraphs for rich post
+        _contentImages: contentImages,    // inline images from article
+        _likes:        p.reactions?.like || 0,
+        _comments:     p.comments || 0,
       };
     }).filter(a => a.title && a.url);
   }
