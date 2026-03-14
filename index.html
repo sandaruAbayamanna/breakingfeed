@@ -1526,7 +1526,7 @@ async function fetchNews(){
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({})
-          }).then(r => r.json()).catch(() => ({ status: 'error', articles: [] }))
+          }).then(r => r.json()).catch(e => ({ status: 'error', message: e.message, articles: [] }))
         );
       }
 
@@ -1538,7 +1538,16 @@ async function fetchNews(){
         ...(esanaData?.articles || [])
       ];
 
-      if(isSinhalaTab) log(`Esana: ${esanaData?.articles?.length||0} posts, RSS: ${rssData?.articles?.length||0} articles`, 'inf');
+      if(isSinhalaTab) {
+        const esanaCount = esanaData?.articles?.length || 0;
+        const rssCount   = rssData?.articles?.length || 0;
+        if(esanaData?.status === 'error') {
+          log(`⚠ Helakuru Esana: ${esanaData.message}`, 'err');
+        } else {
+          log(`හෙළකුරු එසැණ: ${esanaCount} පුවත් (method: ${esanaData?.method||'?'})`, 'ok');
+        }
+        log(`Sinhala RSS: ${rssCount} articles`, 'inf');
+      }
 
     // ── API providers ──
     } else {
