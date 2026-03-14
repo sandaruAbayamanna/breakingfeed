@@ -1210,8 +1210,11 @@ function syncActiveAccount() {
 
 function setActiveAccount(id) {
   activeAccountId = id;
+  // Switch selectedTargetIds to ONLY this account
+  selectedTargetIds = [id];
   saveFbAccounts();
   renderAccountList();
+  updatePostTargetRow();  // refresh composer target buttons
   const acc = fbAccounts.find(a => a.id === id);
   if (acc) toast(`Active: ${acc.name}`, 'ok');
 }
