@@ -51,3 +51,8 @@
   from = "/api/news/esana"
   to = "/.netlify/functions/fetch-esana"
   status = 200
+
+[[redirects]]
+  from = "/api/yt/download"
+  to = "/.netlify/functions/yt-download"
+  status = 200

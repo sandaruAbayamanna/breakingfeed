@@ -2535,9 +2535,101 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
   const isYT  = videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be');
   const isVim = videoUrl.includes('vimeo.com');
 
-  // ── YouTube / Vimeo: post as embedded link (FB natively plays these) ──
-  if(isYT || isVim) {
-    log('YouTube/Vimeo — posting as embedded link…', 'inf');
+  // ── YouTube: extract direct URL then upload to Facebook ──
+  if(isYT) {
+    log('🎬 YouTube detected — extracting direct download URL…', 'inf');
+    showProgress(10, '🔍 Getting YouTube direct URL…');
+
+    let fakePct = 10;
+    const ytTimer = setInterval(() => {
+      if(fakePct < 88) {
+        fakePct += fakePct < 30 ? 4 : fakePct < 60 ? 2 : 0.8;
+        const stage = fakePct < 25 ? '🔍 Extracting YouTube URL…'
+                    : fakePct < 50 ? '📡 Sending to Facebook…'
+                    : fakePct < 75 ? '⏳ Facebook downloading video…'
+                    : '⏳ Finalizing…';
+        showProgress(Math.round(fakePct), stage);
+      }
+    }, 1200);
+
+    try {
+      const res = await fetch('/api/yt/download', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          url: videoUrl,
+          pageId: fbPageId,
+          access_token: fbToken,
+          caption: cap,
+          title: cleanTitle(a.title).slice(0, 80)
+        })
+      });
+      const data = await res.json();
+      clearInterval(ytTimer);
+      log(`YT download response: status=${data.status} ${data.videoTitle||''} ${data.quality||''}`, 'inf');
+
+      if(data.status === 'ok') {
+        showProgress(100, `✓ YouTube video uploaded! (${data.quality||''} ${data.approxSize||''})`);
+        setTimeout(hideProgress, 3000);
+        markPosted(a, data.id, articleIdx);
+        log(`✓ YouTube video posted as native FB video! "${data.videoTitle}"`, 'ok');
+        return true;
+      }
+
+      if(data.status === 'fb_error' && data.directUrl) {
+        // FB rejected file_url — try binary download fallback using the direct URL
+        log(`⚠ FB file_url rejected (${data.error?.message}) — trying binary upload…`, 'inf');
+        showProgress(50, '📥 Downloading binary fallback…');
+        const fbRes2 = await fetch('/api/fb/video', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            pageId: fbPageId, access_token: fbToken,
+            description: cap, title: cleanTitle(a.title).slice(0,80),
+            file_url: data.directUrl
+          })
+        });
+        const fbData2 = await fbRes2.json();
+        if(!fbData2.error) {
+          showProgress(100, '✓ YouTube video uploaded!');
+          setTimeout(hideProgress, 3000);
+          markPosted(a, fbData2.id, articleIdx);
+          log('✓ YouTube video uploaded via binary fallback', 'ok');
+          return true;
+        }
+        throw new Error(fbData2.error?.message || 'Binary upload also failed');
+      }
+
+      // All upload methods failed — post as embedded link
+      throw new Error(data.error || 'YouTube extraction failed');
+
+    } catch(err) {
+      clearInterval(ytTimer);
+      log(`⚠ YT direct upload failed (${err.message}) — falling back to embedded link`, 'inf');
+      showProgress(88, 'Posting as embedded link…');
+      try {
+        const res = await fetch('/api/fb/post', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken })
+        });
+        const data = await res.json();
+        if(data.error) throw new Error(data.error.message);
+        showProgress(100, '✓ Posted as embedded YouTube link');
+        setTimeout(hideProgress, 2500);
+        markPosted(a, data.id, articleIdx);
+        toast('Posted as embedded link (direct upload failed)', 'ok');
+        return true;
+      } catch(err2) {
+        hideProgress();
+        log('Post failed: '+err2.message,'err');
+        toast('Post failed: '+err2.message,'err');
+        addToQueue(a.title,'ERROR','fail');
+        return false;
+      }
+    }
+  }
+
+  // ── Vimeo: post as embedded link (natively plays in FB) ──
+  if(isVim) {
+    log('Vimeo — posting as embedded link…', 'inf');
     showProgress(30, 'Posting to Facebook…');
     try {
       const res = await fetch('/api/fb/post', {
@@ -2547,13 +2639,13 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
       const data = await res.json();
       log(`FB response: ${JSON.stringify(data)}`, 'inf');
       if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-      showProgress(100, '✓ Video posted!');
+      showProgress(100, '✓ Vimeo video posted!');
       setTimeout(hideProgress, 2000);
       markPosted(a, data.id, articleIdx);
       return true;
     } catch(err) {
       hideProgress();
-      log('YT/Vimeo post failed: '+err.message,'err');
+      log('Vimeo post failed: '+err.message,'err');
       toast('Post failed: '+err.message,'err');
       addToQueue(a.title,'ERROR','fail');
       return false;
@@ -2999,11 +3091,11 @@ function showVideoUploadMode(url) {
   let cls, icon, title, body, tip = '';
 
   if(isYT) {
-    cls   = 'yt';
-    icon  = '⚠️';
-    title = 'YouTube link';
-    body  = 'YouTube blocks server downloads. This will post as an <b>embedded link</b> — viewers tap to open YouTube.';
-    tip   = '💡 For a native FB video, paste a direct .mp4 URL instead';
+    cls   = 'mp4';
+    icon  = '🎬';
+    title = 'YouTube video';
+    body  = 'Will <b>extract direct URL & upload as native Facebook video</b>. Falls back to embedded link if upload fails.';
+    tip   = '💡 Max 20 min videos supported';
   } else if(isVim) {
     cls   = 'vim';
     icon  = '📘';
