@@ -58,3 +58,8 @@
   to = "/.netlify/functions/yt-download"
   status = 200
 
+
+[[redirects]]
+  from = "/api/proxy-download"
+  to = "/.netlify/functions/proxy-download"
+  status = 200

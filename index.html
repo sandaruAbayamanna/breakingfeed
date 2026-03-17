@@ -3171,16 +3171,53 @@ async function downloadVideoToDevice() {
   }
 }
 
-function triggerDownload(url, filename) {
-  // Create a temporary anchor and click it to trigger browser download
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => document.body.removeChild(a), 1000);
+async function triggerDownload(url, filename) {
+  // Same-origin or blob URLs — download directly
+  const isSameOrigin = url.startsWith(window.location.origin) || url.startsWith('blob:');
+
+  if(isSameOrigin) {
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.target = '_blank';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => document.body.removeChild(a), 1000);
+    return;
+  }
+
+  // Cross-origin URL — proxy through Netlify to force Save dialog
+  // For large videos (>45MB) fall back to opening in new tab
+  log(`⬇️ Proxying download: ${filename}…`, 'inf');
+  toast('⏳ Preparing download…', 'inf');
+
+  try {
+    const res = await fetch('/api/proxy-download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, filename })
+    });
+
+    // Check if it's a JSON error response
+    const contentType = res.headers.get('content-type') || '';
+    if(contentType.includes('application/json')) {
+      const err = await res.json();
+      throw new Error(err.error || 'Proxy failed');
+    }
+
+    // It's the video binary — create blob URL and trigger download
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(a); }, 3000);
+    toast('✓ Download started', 'ok');
+    log(`✓ Downloaded: ${filename}`, 'ok');
+
+  } catch(err) {
+    // Proxy failed (too large or blocked) — open in new tab as fallback
+    log(`Proxy failed (${err.message}) — opening in new tab`, 'inf');
+    toast('Opening in new tab — long-press to save', 'inf');
+    window.open(url, '_blank');
+  }
 }
 
 function showVideoUploadMode(url) {
@@ -3212,6 +3249,7 @@ function showVideoUploadMode(url) {
     icon  = '✅';
     title = 'Direct video file';
     body  = 'Will be <b>downloaded & uploaded directly</b> to Facebook as a native video post.';
+    tip   = '⬇️ Download button saves video to your device';
     showDlBtn(true);
   } else {
     cls   = 'unk';
