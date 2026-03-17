@@ -1,4 +1,5 @@
 [build]
+  command = "npm install"
   functions = "netlify/functions"
   publish = "."
 
@@ -13,6 +14,21 @@
   status = 200
 
 [[redirects]]
+  from = "/api/news/fetch"
+  to = "/.netlify/functions/fetch-news"
+  status = 200
+
+[[redirects]]
+  from = "/api/news/rss"
+  to = "/.netlify/functions/fetch-rss"
+  status = 200
+
+[[redirects]]
+  from = "/api/news/esana"
+  to = "/.netlify/functions/fetch-esana"
+  status = 200
+
+[[redirects]]
   from = "/api/fb/post"
   to = "/.netlify/functions/fb-post"
   status = 200
@@ -23,13 +39,13 @@
   status = 200
 
 [[redirects]]
-  from = "/api/extract-video"
-  to = "/.netlify/functions/extract-video"
+  from = "/api/fb/photo"
+  to = "/.netlify/functions/fb-photo"
   status = 200
 
 [[redirects]]
-  from = "/api/news/fetch"
-  to = "/.netlify/functions/fetch-news"
+  from = "/api/extract-video"
+  to = "/.netlify/functions/extract-video"
   status = 200
 
 [[redirects]]
@@ -38,21 +54,9 @@
   status = 200
 
 [[redirects]]
-  from = "/api/news/rss"
-  to = "/.netlify/functions/fetch-rss"
-  status = 200
-
-[[redirects]]
-  from = "/api/fb/photo"
-  to = "/.netlify/functions/fb-photo"
-  status = 200
-
-[[redirects]]
-  from = "/api/news/esana"
-  to = "/.netlify/functions/fetch-esana"
-  status = 200
-
-[[redirects]]
   from = "/api/yt/download"
   to = "/.netlify/functions/yt-download"
   status = 200
+
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
