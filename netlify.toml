@@ -63,3 +63,8 @@
   from = "/api/proxy-download"
   to = "/.netlify/functions/proxy-download"
   status = 200
+
+[[redirects]]
+  from = "/api/fb/live"
+  to = "/.netlify/functions/fb-live"
+  status = 200

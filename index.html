@@ -727,6 +727,31 @@ select.inp{cursor:pointer;}
 .vid-indicator.unk { background: rgba(255,173,51,0.12); border-color: rgba(255,173,51,0.4); color: #FFAD33; }
 .vid-indicator .tip { color: var(--muted2); font-size: 9px; margin-top: 4px; display: block; }
 
+/* ═══ LIVE PANEL ═══ */
+.live-panel {
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+}
+@media (max-width: 768px) {
+  .live-panel {
+    display: none;
+    border-left: none !important;
+    height: calc(100dvh - 56px - 48px) !important;
+  }
+  .live-panel.mob-active { display: flex !important; flex-direction: column; }
+}
+@media (min-width: 769px) {
+  .layout { grid-template-columns: 260px 1fr 340px !important; }
+  .live-panel { display: none; } /* hidden on desktop unless toggled */
+}
+/* Pulsing live dot */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+.live-dot { display: inline-block; width: 8px; height: 8px; background: var(--red); border-radius: 50%; animation: livePulse 1.2s ease-in-out infinite; margin-right: 4px; }
+
 </style>
 </head>
 <body>
@@ -1135,6 +1160,74 @@ select.inp{cursor:pointer;}
     </div>
 
   </aside>
+
+  <!-- ═ LIVE PANEL ═ -->
+  <div class="live-panel" id="livePanel" style="display:none;flex-direction:column;background:var(--bg);overflow-y:auto;">
+
+    <!-- YouTube Live Viewer -->
+    <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:12px;">
+      <div class="sb-label">🔴 WATCH YOUTUBE LIVE</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <input class="inp" id="ytLiveUrl" placeholder="Paste YouTube live URL or video ID…" style="margin:0;flex:1;" />
+        <button class="btn btn-red" style="padding:8px 12px;white-space:nowrap;" onclick="loadYtLive()">▶ WATCH</button>
+      </div>
+      <!-- Quick presets for known Sri Lanka live channels -->
+      <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:5px;">SRI LANKA LIVE</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">
+        <button class="chip-btn" onclick="loadYtLiveById('UCnpWGSX-4XTDJ-ZqbNQQO1g')">📺 Ada Derana</button>
+        <button class="chip-btn" onclick="loadYtLiveById('UCBqU9bASdMl0Gg_pSZRSiog')">📺 Hiru TV</button>
+        <button class="chip-btn" onclick="loadYtLiveById('UCF9T8RObhDYMpbLI-ZWQTOw')">📺 Sirasa TV</button>
+        <button class="chip-btn" onclick="loadYtLiveById('UCHRp19HU7Y2LwfI0Ai6WAGQ')">📺 Newsfirst</button>
+        <button class="chip-btn" onclick="loadYtLiveById('UCcyjHJOM5UYuGTfv7JJvgIA')">📺 Al Jazeera</button>
+        <button class="chip-btn" onclick="loadYtLiveById('UCupvZG-5ko_eiXAupbDfxWw')">📺 CNN</button>
+      </div>
+      <!-- YouTube embed player -->
+      <div id="ytLivePlayer" style="display:none;border-radius:8px;overflow:hidden;background:#000;aspect-ratio:16/9;">
+        <iframe id="ytLiveFrame" width="100%" height="100%" frameborder="0" allow="autoplay;encrypted-media" allowfullscreen style="display:block;"></iframe>
+      </div>
+    </div>
+
+    <!-- Facebook Live via RTMP -->
+    <div style="padding:12px;background:var(--surface);border-bottom:1px solid var(--border);">
+      <div class="sb-label">📡 STREAM TO FACEBOOK LIVE</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:10px;line-height:1.6;">
+        Create a Facebook Live session, get the RTMP URL + stream key, then push any source using OBS or restream.io.
+      </div>
+      <input class="inp" id="liveTitle" placeholder="Live title (e.g. Breaking: Live Coverage…)" style="margin-bottom:6px;" />
+      <input class="inp" id="liveDesc" placeholder="Description (optional)" style="margin-bottom:8px;" />
+      <button class="btn btn-red" id="startLiveBtn" onclick="startFbLive()" style="margin-bottom:6px;">
+        🔴 CREATE FACEBOOK LIVE
+      </button>
+      <button class="btn btn-ghost" id="endLiveBtn" onclick="endFbLive()" style="display:none;border-color:var(--red);color:var(--red);">
+        ⏹ END LIVE STREAM
+      </button>
+
+      <!-- RTMP details shown after creation -->
+      <div id="liveDetails" style="display:none;margin-top:10px;background:var(--card);border:1px solid var(--border2);border-radius:6px;padding:10px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);margin-bottom:8px;letter-spacing:1px;">✓ LIVE SESSION CREATED</div>
+        <div class="sb-label" style="font-size:8px;">RTMP SERVER URL</div>
+        <div style="display:flex;gap:4px;margin-bottom:8px;">
+          <input class="inp" id="rtmpUrl" readonly style="margin:0;flex:1;font-size:9px;color:var(--green);" />
+          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpUrl')">📋</button>
+        </div>
+        <div class="sb-label" style="font-size:8px;">STREAM KEY</div>
+        <div style="display:flex;gap:4px;margin-bottom:8px;">
+          <input class="inp" id="rtmpKey" readonly type="password" style="margin:0;flex:1;font-size:9px;" />
+          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="toggleStreamKey()">👁</button>
+          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpKey')">📋</button>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);line-height:1.7;">
+          Use these in OBS: Settings → Stream → Custom → paste URL + Key<br>
+          Or use <b>restream.io</b> to relay from YouTube Live to Facebook Live
+        </div>
+        <!-- Live viewer count -->
+        <div id="liveViewers" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--red);display:none;">
+          🔴 LIVE · <span id="viewerCount">0</span> viewers
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -3376,6 +3469,7 @@ function mobSwitch(panel) {
   const panels = {
     settings: { el: document.querySelector('.sidebar'),   btn: 'mobBtnSettings' },
     feed:     { el: document.querySelector('.feed-wrap'), btn: 'mobBtnFeed' },
+    live:     { el: document.getElementById('livePanel'), btn: 'mobBtnLive' },
     compose:  { el: document.querySelector('.rpanel'),    btn: 'mobBtnCompose' },
   };
 
@@ -3443,7 +3537,8 @@ window.addEventListener('resize', () => {
   const rpanel   = document.querySelector('.rpanel');
   if (window.innerWidth > 768) {
     // Restore all panels visible on desktop
-    [sidebar, feed, rpanel].forEach(el => {
+    const lp = document.getElementById('livePanel');
+    [sidebar, feed, rpanel, lp].forEach(el => {
       if (el) el.classList.remove('mob-active');
     });
   } else {
@@ -3452,9 +3547,155 @@ window.addEventListener('resize', () => {
   }
 });
 
+// ══════════════════════════════════════════
+// LIVE FEED — YouTube viewer + FB Live
+// ══════════════════════════════════════════
+
+let fbLiveId    = null;
+let liveWatcher = null;
+
+// ── YouTube Live embed ──
+function loadYtLive() {
+  const val = document.getElementById('ytLiveUrl').value.trim();
+  if(!val){ toast('Paste a YouTube URL or video ID','err'); return; }
+  // Extract video ID from various URL formats
+  let vid = val;
+  const m = val.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|shorts\/))([^?&#]+)/);
+  if(m) vid = m[1];
+  loadYtLiveById(vid);
+}
+
+function loadYtLiveById(channelOrVideoId) {
+  const player   = document.getElementById('ytLivePlayer');
+  const frame    = document.getElementById('ytLiveFrame');
+  // For channel IDs (UC...) use channel live embed, for video IDs use direct embed
+  const isChannel = channelOrVideoId.startsWith('UC');
+  const src = isChannel
+    ? `https://www.youtube.com/embed/live_stream?channel=${channelOrVideoId}&autoplay=1`
+    : `https://www.youtube.com/embed/${channelOrVideoId}?autoplay=1&rel=0`;
+  frame.src   = src;
+  player.style.display = 'block';
+  log(`▶ Loading YouTube live: ${channelOrVideoId}`, 'inf');
+  // Switch to live tab on mobile
+  if(window.innerWidth <= 768) mobSwitch('live');
+}
+
+// ── Facebook Live create ──
+async function startFbLive() {
+  const acc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+  if(!acc){ toast('Add a Facebook page first','err'); return; }
+
+  const title = document.getElementById('liveTitle').value.trim() || 'Live Stream';
+  const desc  = document.getElementById('liveDesc').value.trim();
+  const btn   = document.getElementById('startLiveBtn');
+
+  btn.disabled = true; btn.textContent = '⏳ Creating…';
+  log('Creating Facebook Live session…','inf');
+
+  try {
+    const res = await fetch('/api/fb/live', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action: 'create',
+        pageId: acc.pageId.trim(),
+        access_token: acc.token.replace(/\s+/g,''),
+        title, description: desc
+      })
+    });
+    const data = await res.json();
+    if(data.status === 'error') throw new Error(data.error);
+
+    fbLiveId = data.id;
+
+    // Parse RTMP URL and key from stream_url
+    // stream_url format: rtmps://live-api-s.facebook.com:443/rtmp/STREAMKEY
+    const streamUrl = data.secure_stream_url || data.stream_url || '';
+    const lastSlash  = streamUrl.lastIndexOf('/');
+    const rtmpServer = streamUrl.slice(0, lastSlash + 1);
+    const streamKey  = streamUrl.slice(lastSlash + 1);
+
+    document.getElementById('rtmpUrl').value = rtmpServer || streamUrl;
+    document.getElementById('rtmpKey').value = streamKey;
+    document.getElementById('liveDetails').style.display = 'block';
+    document.getElementById('endLiveBtn').style.display  = 'block';
+    btn.textContent = '🔴 LIVE — Created';
+
+    // Start polling viewer count
+    document.getElementById('liveViewers').style.display = 'block';
+    liveWatcher = setInterval(() => pollLiveViewers(acc), 15000);
+
+    log(`✓ Facebook Live created! ID: ${fbLiveId}`, 'ok');
+    toast('Facebook Live created — copy RTMP details', 'ok');
+
+  } catch(err) {
+    log('FB Live create failed: '+err.message,'err');
+    toast('Failed: '+err.message,'err');
+    btn.disabled = false; btn.textContent = '🔴 CREATE FACEBOOK LIVE';
+  }
+}
+
+async function pollLiveViewers(acc) {
+  if(!fbLiveId) return;
+  try {
+    const res = await fetch('/api/fb/live', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action: 'status', liveVideoId: fbLiveId,
+        access_token: acc.token.replace(/\s+/g,'')
+      })
+    });
+    const data = await res.json();
+    if(data.live_views !== undefined) {
+      document.getElementById('viewerCount').textContent = data.live_views;
+    }
+  } catch {}
+}
+
+async function endFbLive() {
+  if(!fbLiveId){ toast('No active live session','err'); return; }
+  const acc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+  clearInterval(liveWatcher);
+  liveWatcher = null;
+
+  try {
+    await fetch('/api/fb/live', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        action: 'end', liveVideoId: fbLiveId,
+        access_token: acc.token.replace(/\s+/g,'')
+      })
+    });
+    fbLiveId = null;
+    document.getElementById('liveDetails').style.display = 'none';
+    document.getElementById('endLiveBtn').style.display  = 'none';
+    document.getElementById('liveViewers').style.display = 'none';
+    document.getElementById('startLiveBtn').disabled     = false;
+    document.getElementById('startLiveBtn').textContent  = '🔴 CREATE FACEBOOK LIVE';
+    log('Facebook Live ended','ok');
+    toast('Live stream ended','ok');
+  } catch(err) {
+    toast('Failed to end: '+err.message,'err');
+  }
+}
+
+function toggleStreamKey() {
+  const f = document.getElementById('rtmpKey');
+  f.type = f.type === 'password' ? 'text' : 'password';
+}
+
+function copyField(id) {
+  const val = document.getElementById(id).value;
+  navigator.clipboard.writeText(val).then(() => toast('Copied ✓','ok')).catch(() => {
+    // Fallback for mobile
+    const el = document.getElementById(id);
+    el.select(); document.execCommand('copy');
+    toast('Copied ✓','ok');
+  });
+}
+
 </script>
 <!-- ═ MOBILE NAV ═ -->
-<nav class="mob-nav" id="mobNav">
+<nav class="mob-nav" id="mobNav" style="grid-template-columns:repeat(4,1fr);">
   <button class="mob-nav-btn" id="mobBtnSettings" onclick="mobSwitch('settings')">
     <span class="nav-icon">⚙️</span>
     <span>SETTINGS</span>
@@ -3462,6 +3703,10 @@ window.addEventListener('resize', () => {
   <button class="mob-nav-btn active" id="mobBtnFeed" onclick="mobSwitch('feed')">
     <span class="nav-icon">📡</span>
     <span>FEED</span>
+  </button>
+  <button class="mob-nav-btn" id="mobBtnLive" onclick="mobSwitch('live')">
+    <span class="nav-icon">🔴</span>
+    <span>LIVE</span>
   </button>
   <button class="mob-nav-btn" id="mobBtnCompose" onclick="mobSwitch('compose')">
     <span class="nav-icon">📤</span>
