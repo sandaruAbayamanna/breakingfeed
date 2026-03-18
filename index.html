@@ -732,18 +732,27 @@ select.inp{cursor:pointer;}
   background: var(--bg);
   border-left: 1px solid var(--border);
   overflow-y: auto;
+  display: none; /* hidden by default everywhere */
 }
 @media (max-width: 768px) {
   .live-panel {
-    display: none;
+    display: none !important;
     border-left: none !important;
     height: calc(100dvh - 56px - 48px) !important;
+    width: 100% !important;
+    position: relative !important;
   }
-  .live-panel.mob-active { display: flex !important; flex-direction: column; }
+  .live-panel.mob-active {
+    display: flex !important;
+    flex-direction: column;
+  }
 }
 @media (min-width: 769px) {
   .layout { grid-template-columns: 260px 1fr 340px !important; }
-  .live-panel { display: none; } /* hidden on desktop unless toggled */
+  .layout.show-live { grid-template-columns: 260px 1fr 340px 360px !important; }
+  .live-panel { display: none !important; }
+  .layout.show-live .live-panel { display: flex !important; }
+  #hdrLiveBtn { display: inline-block !important; }
 }
 /* Pulsing live dot */
 @keyframes livePulse {
@@ -771,6 +780,12 @@ select.inp{cursor:pointer;}
     <div class="hdr-stat posted"><div class="n" id="sPosted">0</div><div class="l">POSTED</div></div>
     <div class="hdr-stat queued"><div class="n" id="sQueued">0</div><div class="l">QUEUED</div></div>
   </div>
+  <button id="hdrLiveBtn" onclick="toggleDesktopLive()" 
+    style="font-family:'JetBrains Mono',monospace;font-size:9px;padding:5px 10px;
+    border:1px solid var(--red);background:transparent;color:var(--red);
+    border-radius:4px;cursor:pointer;letter-spacing:1px;display:none;">
+    🔴 LIVE
+  </button>
 </header>
 
 <!-- ═══ LAYOUT ═══ -->
@@ -1162,7 +1177,7 @@ select.inp{cursor:pointer;}
   </aside>
 
   <!-- ═ LIVE PANEL ═ -->
-  <div class="live-panel" id="livePanel" style="display:none;flex-direction:column;background:var(--bg);overflow-y:auto;">
+  <div class="live-panel" id="livePanel" style="flex-direction:column;background:var(--bg);overflow-y:auto;">
 
     <!-- YouTube Live Viewer -->
     <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:12px;">
@@ -3473,7 +3488,7 @@ function mobSwitch(panel) {
     compose:  { el: document.querySelector('.rpanel'),    btn: 'mobBtnCompose' },
   };
 
-  // Toggle panels
+  // Toggle panels — also explicitly hide/show since live panel has display:none default
   Object.entries(panels).forEach(([name, { el, btn }]) => {
     if (!el) return;
     if (name === panel) {
@@ -3546,6 +3561,16 @@ window.addEventListener('resize', () => {
     mobSwitch(mobActivePanel);
   }
 });
+
+// ── Desktop live panel toggle ──
+function toggleDesktopLive() {
+  const layout = document.querySelector('.layout');
+  const btn    = document.getElementById('hdrLiveBtn');
+  const isOn   = layout.classList.toggle('show-live');
+  if(btn) btn.textContent = isOn ? '✕ LIVE' : '🔴 LIVE';
+  if(btn) btn.style.background = isOn ? 'var(--red)' : 'transparent';
+  if(btn) btn.style.color = isOn ? '#fff' : 'var(--red)';
+}
 
 // ══════════════════════════════════════════
 // LIVE FEED — YouTube viewer + FB Live
