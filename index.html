@@ -1212,19 +1212,19 @@ select.inp{cursor:pointer;}
       <!-- Quick channel presets -->
       <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:6px;">🇱🇰 SRI LANKA</div>
       <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
-        <button class="live-ch-btn" onclick="loadYtChannel('UCnpWGSX-4XTDJ-ZqbNQQO1g','Ada Derana')">📺 Ada Derana</button>
-        <button class="live-ch-btn" onclick="loadYtChannel('UCBqU9bASdMl0Gg_pSZRSiog','Hiru TV')">📺 Hiru TV</button>
-        <button class="live-ch-btn" onclick="loadYtChannel('UCF9T8RObhDYMpbLI-ZWQTOw','Sirasa TV')">📺 Sirasa TV</button>
-        <button class="live-ch-btn" onclick="loadYtChannel('UCHRp19HU7Y2LwfI0Ai6WAGQ','NewsFirst')">📺 NewsFirst</button>
-        <button class="live-ch-btn" onclick="loadYtChannel('UCFkuPBfBFBVsLhg8p3r5N5A','Siyatha TV')">📺 Siyatha TV</button>
-        <button class="live-ch-btn" onclick="loadYtChannel('UC9yBTBkDd2XLHVGN6M-6yWg','Rupavahini')">📺 Rupavahini</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('adaderana','Ada Derana')">📺 Ada Derana</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('HiruNewsOfficial','Hiru TV')">📺 Hiru TV</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('SirasaTV','Sirasa TV')">📺 Sirasa TV</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('NewsFirstSriLanka','NewsFirst')">📺 NewsFirst</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('SiyathaTV','Siyatha TV')">📺 Siyatha TV</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('rupavahinilk','Rupavahini')">📺 Rupavahini</button>
       </div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:6px;">🌍 INTERNATIONAL</div>
       <div style="display:flex;flex-wrap:wrap;gap:5px;">
-        <button class="live-ch-btn" onclick="loadYtChannel('UCcyjHJOM5UYuGTfv7JJvgIA','Al Jazeera')">📺 Al Jazeera</button>
-        <button class="live-ch-btn" onclick="loadYtChannel('UCupvZG-5ko_eiXAupbDfxWw','CNN')">📺 CNN</button>
-        <button class="live-ch-btn" onclick="loadYtChannel('UCNye-wNBqNL5ZzHSJdpkiRg','BBC')">📺 BBC</button>
-        <button class="live-ch-btn" onclick="loadYtChannel('UCIvaLZcfz3ikJ1cD-zMpIXg','DW News')">📺 DW News</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('AlJazeeraEnglish','Al Jazeera')">📺 Al Jazeera</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('CNN','CNN')">📺 CNN</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('BBCNews','BBC')">📺 BBC</button>
+        <button class="live-ch-btn" onclick="loadYtHandle('dwnews','DW News')">📺 DW News</button>
       </div>
     </div>
 
@@ -3624,42 +3624,33 @@ function loadYtLive() {
     if(m) { videoId = m[1]; break; }
   }
 
-  // If it looks like a channel ID, find the live video first
+  // If it looks like a channel ID (UC...) use handle lookup
   if(videoId.startsWith('UC') && videoId.length > 20) {
-    loadYtChannel(videoId, videoId);
+    loadYtHandle(videoId, videoId);
     return;
   }
 
   embedYtVideo(videoId, '');
 }
 
-async function loadYtChannel(channelId, name) {
-  const nameEl = document.getElementById('ytLiveName');
-  if(nameEl){ nameEl.style.display='block'; nameEl.textContent = `⏳ Finding ${name} live stream…`; }
-
+function loadYtHandle(handle, name) {
   // Highlight active button
   document.querySelectorAll('.live-ch-btn').forEach(b => b.classList.remove('active'));
   event?.target?.classList.add('active');
 
-  try {
-    const res = await fetch('/api/yt/live', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ channelId })
-    });
-    const data = await res.json();
+  const nameEl = document.getElementById('ytLiveName');
+  if(nameEl){ nameEl.style.display='block'; nameEl.textContent = `▶ ${name} — Loading live stream…`; }
 
-    if(data.status === 'ok' && data.videoId) {
-      embedYtVideo(data.videoId, name);
-    } else {
-      // Channel not currently live — embed the channel page itself as fallback
-      if(nameEl) nameEl.textContent = `⚠️ ${name} may not be live right now. Loading channel…`;
-      // Use the channel URL format which shows latest/live content
-      embedYtVideo(`videoseries?list=UU${channelId.slice(2)}`, name);
-    }
-  } catch(err) {
-    if(nameEl) nameEl.textContent = `Failed: ${err.message}`;
-    toast('Could not load live stream', 'err');
-  }
+  // YouTube's @handle/live embed — opens the channel's current live stream directly
+  // This is the official supported embed format for live channels
+  const src = `https://www.youtube.com/embed/live_stream?channel=${handle}&autoplay=1&modestbranding=1`;
+
+  const player = document.getElementById('ytLivePlayer');
+  const frame  = document.getElementById('ytLiveFrame');
+  frame.src = src;
+  player.style.display = 'block';
+
+  log(`▶ Loading live: ${name}`, 'inf');
 }
 
 function embedYtVideo(videoId, name) {
