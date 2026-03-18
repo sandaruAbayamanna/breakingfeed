@@ -710,6 +710,17 @@ select.inp{cursor:pointer;}
 }
 .chip-btn:hover { border-color: var(--red); color: var(--text); }
 .chip-btn.active { border-color: var(--red); color: var(--red); background: rgba(220,38,38,0.08); }
+/* Live channel buttons */
+.live-ch-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; padding: 5px 9px; border-radius: 5px;
+  border: 1px solid var(--border2); background: var(--card);
+  color: var(--muted); cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.live-ch-btn:hover, .live-ch-btn.active {
+  border-color: var(--red); color: var(--text); background: rgba(220,38,38,0.08);
+}
 
 /* ── Video URL type indicator ── */
 .vid-indicator {
@@ -1182,23 +1193,38 @@ select.inp{cursor:pointer;}
     <!-- YouTube Live Viewer -->
     <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:12px;">
       <div class="sb-label">🔴 WATCH YOUTUBE LIVE</div>
-      <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <input class="inp" id="ytLiveUrl" placeholder="Paste YouTube live URL or video ID…" style="margin:0;flex:1;" />
-        <button class="btn btn-red" style="padding:8px 12px;white-space:nowrap;" onclick="loadYtLive()">▶ WATCH</button>
+
+      <!-- Paste URL input -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;">
+        <input class="inp" id="ytLiveUrl" placeholder="Paste YouTube URL or video ID here…" style="margin:0;flex:1;" onkeydown="if(event.key==='Enter')loadYtLive()" />
+        <button class="btn btn-red" style="padding:8px 14px;white-space:nowrap;font-size:11px;" onclick="loadYtLive()">▶ PLAY</button>
       </div>
-      <!-- Quick presets for known Sri Lanka live channels -->
-      <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:5px;">SRI LANKA LIVE</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;">
-        <button class="chip-btn" onclick="loadYtLiveById('UCnpWGSX-4XTDJ-ZqbNQQO1g')">📺 Ada Derana</button>
-        <button class="chip-btn" onclick="loadYtLiveById('UCBqU9bASdMl0Gg_pSZRSiog')">📺 Hiru TV</button>
-        <button class="chip-btn" onclick="loadYtLiveById('UCF9T8RObhDYMpbLI-ZWQTOw')">📺 Sirasa TV</button>
-        <button class="chip-btn" onclick="loadYtLiveById('UCHRp19HU7Y2LwfI0Ai6WAGQ')">📺 Newsfirst</button>
-        <button class="chip-btn" onclick="loadYtLiveById('UCcyjHJOM5UYuGTfv7JJvgIA')">📺 Al Jazeera</button>
-        <button class="chip-btn" onclick="loadYtLiveById('UCupvZG-5ko_eiXAupbDfxWw')">📺 CNN</button>
+
+      <!-- YouTube embed player — shown immediately when URL pasted -->
+      <div id="ytLivePlayer" style="display:none;border-radius:8px;overflow:hidden;background:#000;position:relative;padding-top:56.25%;margin-bottom:10px;">
+        <iframe id="ytLiveFrame" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
+          allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
       </div>
-      <!-- YouTube embed player -->
-      <div id="ytLivePlayer" style="display:none;border-radius:8px;overflow:hidden;background:#000;aspect-ratio:16/9;">
-        <iframe id="ytLiveFrame" width="100%" height="100%" frameborder="0" allow="autoplay;encrypted-media" allowfullscreen style="display:block;"></iframe>
+
+      <!-- Current channel name -->
+      <div id="ytLiveName" style="display:none;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);margin-bottom:8px;"></div>
+
+      <!-- Quick channel presets -->
+      <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:6px;">🇱🇰 SRI LANKA</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+        <button class="live-ch-btn" onclick="loadYtChannel('UCnpWGSX-4XTDJ-ZqbNQQO1g','Ada Derana')">📺 Ada Derana</button>
+        <button class="live-ch-btn" onclick="loadYtChannel('UCBqU9bASdMl0Gg_pSZRSiog','Hiru TV')">📺 Hiru TV</button>
+        <button class="live-ch-btn" onclick="loadYtChannel('UCF9T8RObhDYMpbLI-ZWQTOw','Sirasa TV')">📺 Sirasa TV</button>
+        <button class="live-ch-btn" onclick="loadYtChannel('UCHRp19HU7Y2LwfI0Ai6WAGQ','NewsFirst')">📺 NewsFirst</button>
+        <button class="live-ch-btn" onclick="loadYtChannel('UCFkuPBfBFBVsLhg8p3r5N5A','Siyatha TV')">📺 Siyatha TV</button>
+        <button class="live-ch-btn" onclick="loadYtChannel('UC9yBTBkDd2XLHVGN6M-6yWg','Rupavahini')">📺 Rupavahini</button>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:6px;">🌍 INTERNATIONAL</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;">
+        <button class="live-ch-btn" onclick="loadYtChannel('UCcyjHJOM5UYuGTfv7JJvgIA','Al Jazeera')">📺 Al Jazeera</button>
+        <button class="live-ch-btn" onclick="loadYtChannel('UCupvZG-5ko_eiXAupbDfxWw','CNN')">📺 CNN</button>
+        <button class="live-ch-btn" onclick="loadYtChannel('UCNye-wNBqNL5ZzHSJdpkiRg','BBC')">📺 BBC</button>
+        <button class="live-ch-btn" onclick="loadYtChannel('UCIvaLZcfz3ikJ1cD-zMpIXg','DW News')">📺 DW News</button>
       </div>
     </div>
 
@@ -3583,26 +3609,82 @@ let liveWatcher = null;
 function loadYtLive() {
   const val = document.getElementById('ytLiveUrl').value.trim();
   if(!val){ toast('Paste a YouTube URL or video ID','err'); return; }
-  // Extract video ID from various URL formats
-  let vid = val;
-  const m = val.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|shorts\/))([^?&#]+)/);
-  if(m) vid = m[1];
-  loadYtLiveById(vid);
+
+  // Extract video ID from URL
+  let videoId = val;
+  const patterns = [
+    /youtu\.be\/([^?&#]+)/,
+    /youtube\.com\/watch\?v=([^&]+)/,
+    /youtube\.com\/live\/([^?&#]+)/,
+    /youtube\.com\/shorts\/([^?&#]+)/,
+    /youtube\.com\/embed\/([^?&#]+)/,
+  ];
+  for(const p of patterns) {
+    const m = val.match(p);
+    if(m) { videoId = m[1]; break; }
+  }
+
+  // If it looks like a channel ID, find the live video first
+  if(videoId.startsWith('UC') && videoId.length > 20) {
+    loadYtChannel(videoId, videoId);
+    return;
+  }
+
+  embedYtVideo(videoId, '');
 }
 
-function loadYtLiveById(channelOrVideoId) {
-  const player   = document.getElementById('ytLivePlayer');
-  const frame    = document.getElementById('ytLiveFrame');
-  // For channel IDs (UC...) use channel live embed, for video IDs use direct embed
-  const isChannel = channelOrVideoId.startsWith('UC');
-  const src = isChannel
-    ? `https://www.youtube.com/embed/live_stream?channel=${channelOrVideoId}&autoplay=1`
-    : `https://www.youtube.com/embed/${channelOrVideoId}?autoplay=1&rel=0`;
-  frame.src   = src;
+async function loadYtChannel(channelId, name) {
+  const nameEl = document.getElementById('ytLiveName');
+  if(nameEl){ nameEl.style.display='block'; nameEl.textContent = `⏳ Finding ${name} live stream…`; }
+
+  // Highlight active button
+  document.querySelectorAll('.live-ch-btn').forEach(b => b.classList.remove('active'));
+  event?.target?.classList.add('active');
+
+  try {
+    const res = await fetch('/api/yt/live', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ channelId })
+    });
+    const data = await res.json();
+
+    if(data.status === 'ok' && data.videoId) {
+      embedYtVideo(data.videoId, name);
+    } else {
+      // Channel not currently live — embed the channel page itself as fallback
+      if(nameEl) nameEl.textContent = `⚠️ ${name} may not be live right now. Loading channel…`;
+      // Use the channel URL format which shows latest/live content
+      embedYtVideo(`videoseries?list=UU${channelId.slice(2)}`, name);
+    }
+  } catch(err) {
+    if(nameEl) nameEl.textContent = `Failed: ${err.message}`;
+    toast('Could not load live stream', 'err');
+  }
+}
+
+function embedYtVideo(videoId, name) {
+  const player = document.getElementById('ytLivePlayer');
+  const frame  = document.getElementById('ytLiveFrame');
+  const nameEl = document.getElementById('ytLiveName');
+
+  // Build embed URL
+  const src = videoId.includes('?')
+    ? `https://www.youtube.com/embed/${videoId}&autoplay=1`
+    : `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`;
+
+  frame.src = src;
   player.style.display = 'block';
-  log(`▶ Loading YouTube live: ${channelOrVideoId}`, 'inf');
-  // Switch to live tab on mobile
-  if(window.innerWidth <= 768) mobSwitch('live');
+
+  if(nameEl && name) {
+    nameEl.style.display = 'block';
+    nameEl.textContent = `▶ ${name}`;
+  }
+
+  log(`▶ Loaded: ${name || videoId}`, 'inf');
+  // Switch to live tab on mobile if not already there
+  if(window.innerWidth <= 768 && document.getElementById('livePanel').classList.contains('mob-active') === false) {
+    mobSwitch('live');
+  }
 }
 
 // ── Facebook Live create ──

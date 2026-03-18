@@ -68,3 +68,8 @@
   from = "/api/fb/live"
   to = "/.netlify/functions/fb-live"
   status = 200
+
+[[redirects]]
+  from = "/api/yt/live"
+  to = "/.netlify/functions/yt-live"
+  status = 200
