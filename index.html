@@ -1110,12 +1110,12 @@ select.inp{cursor:pointer;}
             <div id="extractStatus" style="margin-top:6px;display:none;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);"></div>
             <!-- Results list -->
             <div id="videoResults" style="display:none;margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
+            <!-- Download button — always rendered, shown when video selected -->
+            <button id="dlExtractBtn" style="display:none;width:100%;margin-top:8px;padding:9px;border:1px solid var(--amber);background:rgba(255,173,51,0.12);color:var(--amber);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;font-weight:700;" onclick="downloadSelectedExtracted()">
+              ⬇️ DOWNLOAD TO DEVICE
+            </button>
             <!-- Selected video preview -->
             <div id="selectedVideoPrev" style="display:none;margin-top:8px;"></div>
-            <!-- Download button — shown after video selected -->
-            <button id="dlExtractBtn" style="display:none;width:100%;margin-top:8px;padding:7px;border:1px solid var(--amber);background:rgba(255,173,51,0.1);color:var(--amber);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;" onclick="downloadSelectedExtracted()">
-              ⬇️ DOWNLOAD SELECTED VIDEO TO DEVICE
-            </button>
           </div>
 
           <!-- URL TAB -->
@@ -2223,28 +2223,21 @@ function selectExtractedVideo(i) {
     </div>`;
   }
 
-  const isYtExtract = v.type === 'youtube' || v.url.includes('youtube.com') || v.url.includes('youtu.be');
-  const canDownload = v.type === 'direct' || v.type === 'hls' || isYtExtract;
-
   prevBox.innerHTML = `<div class="video-selected-box">
     <div class="vsb-title">✓ Selected: ${v.label}</div>
-    <div class="vsb-url">${v.url}</div>
+    <div class="vsb-url" style="word-break:break-all;font-size:8px;">${v.url.slice(0,80)}…</div>
     ${previewHtml}
-    <div style="display:flex;gap:6px;margin-top:6px;">
-      ${canDownload ? `<button onclick="downloadExtractedVideo('${v.url.replace(/'/g,"\'")}','${(v.label||'video').replace(/'/g,"\'")}')"
-        style="flex:1;padding:6px 8px;border:1px solid var(--amber);background:rgba(255,173,51,0.1);color:var(--amber);
-        border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:9px;cursor:pointer;letter-spacing:1px;">
-        ⬇️ DOWNLOAD TO DEVICE
-      </button>` : ''}
-    </div>
     <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:6px;">
-      Source: ${v.source} · This video will be uploaded directly to Facebook
+      Source: ${v.source} · Will be uploaded directly to Facebook
     </div>
   </div>`;
 
-  // Show extract tab download button
+  // Always show the download button (handled by dlExtractBtn outside prevBox)
   const dlBtn = document.getElementById('dlExtractBtn');
-  if(dlBtn) dlBtn.style.display = 'block';
+  if(dlBtn) {
+    dlBtn.style.display = 'block';
+    dlBtn.textContent = '⬇️ DOWNLOAD TO DEVICE: ' + (v.label || 'video').slice(0, 30);
+  }
 
   // Also update FB preview
   document.getElementById('fbMediaPrev').innerHTML = `<div class="fb-media-vid">▶ 🎬 ${v.label}</div>`;
