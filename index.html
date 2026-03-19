@@ -1112,6 +1112,10 @@ select.inp{cursor:pointer;}
             <div id="videoResults" style="display:none;margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
             <!-- Selected video preview -->
             <div id="selectedVideoPrev" style="display:none;margin-top:8px;"></div>
+            <!-- Download button — shown after video selected -->
+            <button id="dlExtractBtn" style="display:none;width:100%;margin-top:8px;padding:7px;border:1px solid var(--amber);background:rgba(255,173,51,0.1);color:var(--amber);border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;letter-spacing:1px;" onclick="downloadSelectedExtracted()">
+              ⬇️ DOWNLOAD SELECTED VIDEO TO DEVICE
+            </button>
           </div>
 
           <!-- URL TAB -->
@@ -1231,39 +1235,70 @@ select.inp{cursor:pointer;}
     <!-- Facebook Live via RTMP -->
     <div style="padding:12px;background:var(--surface);border-bottom:1px solid var(--border);">
       <div class="sb-label">📡 STREAM TO FACEBOOK LIVE</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:10px;line-height:1.6;">
-        Create a Facebook Live session, get the RTMP URL + stream key, then push any source using OBS or restream.io.
+
+      <!-- Permission warning box -->
+      <div style="background:rgba(255,173,51,0.08);border:1px solid rgba(255,173,51,0.35);border-radius:6px;padding:10px;margin-bottom:12px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--amber);font-weight:700;margin-bottom:6px;">⚠️ REQUIRES FACEBOOK APP REVIEW</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);line-height:1.8;">
+          Facebook Live API requires <b>publish_video</b> permission which needs App Review approval from Meta.<br>
+          Your page also needs <b>60+ days old</b> and <b>100+ followers</b> to go live via API.
+        </div>
       </div>
-      <input class="inp" id="liveTitle" placeholder="Live title (e.g. Breaking: Live Coverage…)" style="margin-bottom:6px;" />
-      <input class="inp" id="liveDesc" placeholder="Description (optional)" style="margin-bottom:8px;" />
+
+      <!-- Practical alternative — get RTMP from Facebook directly -->
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:10px;line-height:1.7;">
+        💡 <b>Easiest method:</b> Get your RTMP key directly from Facebook, then use it here with OBS or restream.io.
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
+        <button class="btn btn-ghost" style="font-size:10px;text-align:left;justify-content:flex-start;gap:8px;"
+          onclick="window.open('https://www.facebook.com/live/producer?ref=OBS','_blank')">
+          🔗 Get RTMP key from Facebook Live Producer →
+        </button>
+        <button class="btn btn-ghost" style="font-size:10px;text-align:left;justify-content:flex-start;gap:8px;"
+          onclick="window.open('https://restream.io','_blank')">
+          🔗 Restream.io — relay YouTube → Facebook Live →
+        </button>
+      </div>
+
+      <!-- Manual RTMP paste section -->
+      <div class="sb-label" style="font-size:8px;margin-bottom:6px;">PASTE YOUR RTMP DETAILS FROM FACEBOOK</div>
+      <input class="inp" id="liveTitle" placeholder="Stream title (for your reference)" style="margin-bottom:6px;" />
+      <div style="display:flex;gap:4px;margin-bottom:6px;">
+        <input class="inp" id="rtmpUrl" placeholder="RTMP Server URL  e.g. rtmps://live-api-s.facebook.com:443/rtmp/" style="margin:0;flex:1;font-size:9px;" />
+        <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpUrl')">📋</button>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:10px;">
+        <input class="inp" id="rtmpKey" type="password" placeholder="Stream Key from Facebook" style="margin:0;flex:1;font-size:9px;" />
+        <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="toggleStreamKey()">👁</button>
+        <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpKey')">📋</button>
+      </div>
+
+      <!-- Try API button (still works if page has publish_video) -->
       <button class="btn btn-red" id="startLiveBtn" onclick="startFbLive()" style="margin-bottom:6px;">
-        🔴 CREATE FACEBOOK LIVE
+        🔴 TRY CREATE LIVE VIA API
       </button>
       <button class="btn btn-ghost" id="endLiveBtn" onclick="endFbLive()" style="display:none;border-color:var(--red);color:var(--red);">
         ⏹ END LIVE STREAM
       </button>
 
-      <!-- RTMP details shown after creation -->
-      <div id="liveDetails" style="display:none;margin-top:10px;background:var(--card);border:1px solid var(--border2);border-radius:6px;padding:10px;">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);margin-bottom:8px;letter-spacing:1px;">✓ LIVE SESSION CREATED</div>
-        <div class="sb-label" style="font-size:8px;">RTMP SERVER URL</div>
-        <div style="display:flex;gap:4px;margin-bottom:8px;">
-          <input class="inp" id="rtmpUrl" readonly style="margin:0;flex:1;font-size:9px;color:var(--green);" />
-          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpUrl')">📋</button>
+      <!-- API success details -->
+      <div id="liveDetails" style="display:none;margin-top:10px;background:var(--card);border:1px solid rgba(45,214,113,0.3);border-radius:6px;padding:10px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);margin-bottom:8px;letter-spacing:1px;">✓ FACEBOOK LIVE CREATED — COPY RTMP DETAILS ABOVE</div>
+        <div id="liveViewers" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--red);display:none;">
+          <span class="live-dot"></span>LIVE · <span id="viewerCount">0</span> viewers
         </div>
-        <div class="sb-label" style="font-size:8px;">STREAM KEY</div>
-        <div style="display:flex;gap:4px;margin-bottom:8px;">
-          <input class="inp" id="rtmpKey" readonly type="password" style="margin:0;flex:1;font-size:9px;" />
-          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="toggleStreamKey()">👁</button>
-          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpKey')">📋</button>
-        </div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);line-height:1.7;">
-          Use these in OBS: Settings → Stream → Custom → paste URL + Key<br>
-          Or use <b>restream.io</b> to relay from YouTube Live to Facebook Live
-        </div>
-        <!-- Live viewer count -->
-        <div id="liveViewers" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--red);display:none;">
-          🔴 LIVE · <span id="viewerCount">0</span> viewers
+      </div>
+
+      <!-- OBS instructions -->
+      <div style="margin-top:12px;background:var(--card);border-radius:6px;padding:10px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:6px;">HOW TO GO LIVE WITH OBS</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);line-height:1.9;">
+          1. Open OBS → Settings → Stream<br>
+          2. Service: <b>Custom</b><br>
+          3. Server: paste RTMP URL<br>
+          4. Stream Key: paste key<br>
+          5. Click <b>Start Streaming</b>
         </div>
       </div>
     </div>
@@ -2080,6 +2115,9 @@ function setVideoTab(tab, btn) {
   btn.classList.add('on');
   document.getElementById('videoExtractPanel').style.display = tab==='extract' ? 'block' : 'none';
   document.getElementById('videoUrlPanel').style.display     = tab==='url'     ? 'block' : 'none';
+  // Show extract download btn if a video is already selected
+  const dlBtn = document.getElementById('dlExtractBtn');
+  if(dlBtn) dlBtn.style.display = (tab==='extract' && selectedExtractedVideo) ? 'block' : 'none';
 }
 
 // ══════════════════════════════════════════
@@ -2204,9 +2242,18 @@ function selectExtractedVideo(i) {
     </div>
   </div>`;
 
+  // Show extract tab download button
+  const dlBtn = document.getElementById('dlExtractBtn');
+  if(dlBtn) dlBtn.style.display = 'block';
+
   // Also update FB preview
   document.getElementById('fbMediaPrev').innerHTML = `<div class="fb-media-vid">▶ 🎬 ${v.label}</div>`;
   log(`Selected video: ${v.label} (${v.type})`, 'inf');
+}
+
+function downloadSelectedExtracted() {
+  if(!selectedExtractedVideo) { toast('Select a video first','err'); return; }
+  downloadExtractedVideo(selectedExtractedVideo.url, selectedExtractedVideo.label || 'video');
 }
 
 async function downloadExtractedVideo(url, label) {
@@ -3683,12 +3730,10 @@ async function startFbLive() {
   const acc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
   if(!acc){ toast('Add a Facebook page first','err'); return; }
 
-  const title = document.getElementById('liveTitle').value.trim() || 'Live Stream';
-  const desc  = document.getElementById('liveDesc').value.trim();
-  const btn   = document.getElementById('startLiveBtn');
+  const btn = document.getElementById('startLiveBtn');
 
   btn.disabled = true; btn.textContent = '⏳ Creating…';
-  log('Creating Facebook Live session…','inf');
+  log('Creating Facebook Live session via API…','inf');
 
   try {
     const res = await fetch('/api/fb/live', {
@@ -3697,7 +3742,8 @@ async function startFbLive() {
         action: 'create',
         pageId: acc.pageId.trim(),
         access_token: acc.token.replace(/\s+/g,''),
-        title, description: desc
+        title: document.getElementById('liveTitle').value.trim() || 'Live Stream',
+        description: ''
       })
     });
     const data = await res.json();
@@ -3705,9 +3751,7 @@ async function startFbLive() {
 
     fbLiveId = data.id;
 
-    // Parse RTMP URL and key from stream_url
-    // stream_url format: rtmps://live-api-s.facebook.com:443/rtmp/STREAMKEY
-    const streamUrl = data.secure_stream_url || data.stream_url || '';
+    const streamUrl  = data.secure_stream_url || data.stream_url || '';
     const lastSlash  = streamUrl.lastIndexOf('/');
     const rtmpServer = streamUrl.slice(0, lastSlash + 1);
     const streamKey  = streamUrl.slice(lastSlash + 1);
@@ -3716,19 +3760,24 @@ async function startFbLive() {
     document.getElementById('rtmpKey').value = streamKey;
     document.getElementById('liveDetails').style.display = 'block';
     document.getElementById('endLiveBtn').style.display  = 'block';
-    btn.textContent = '🔴 LIVE — Created';
+    btn.textContent = '✓ LIVE CREATED';
 
-    // Start polling viewer count
     document.getElementById('liveViewers').style.display = 'block';
     liveWatcher = setInterval(() => pollLiveViewers(acc), 15000);
 
-    log(`✓ Facebook Live created! ID: ${fbLiveId}`, 'ok');
-    toast('Facebook Live created — copy RTMP details', 'ok');
+    log(`✓ Facebook Live created! RTMP details filled above`, 'ok');
+    toast('✓ Live created — RTMP details filled above', 'ok');
 
   } catch(err) {
-    log('FB Live create failed: '+err.message,'err');
-    toast('Failed: '+err.message,'err');
-    btn.disabled = false; btn.textContent = '🔴 CREATE FACEBOOK LIVE';
+    const isPermErr = err.message.includes('ermission') || err.message.includes('200');
+    if(isPermErr) {
+      log('FB Live needs publish_video permission (App Review). Use Facebook Live Producer link above instead.','err');
+      toast('Needs App Review — use Facebook Live Producer link above','err');
+    } else {
+      log('FB Live create failed: '+err.message,'err');
+      toast('Failed: '+err.message,'err');
+    }
+    btn.disabled = false; btn.textContent = '🔴 TRY CREATE LIVE VIA API';
   }
 }
 
