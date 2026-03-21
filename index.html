@@ -1544,6 +1544,35 @@ async function postToAllTargets(articleIdx) {
 
   if (!targets.length) { toast('Select at least one target page', 'err'); return; }
 
+  // ── AUTO-DETECT: set post type based on article content ──
+  const idx = articleIdx !== undefined ? articleIdx : selIdx;
+  if (idx !== null && idx !== undefined) {
+    const art = articles[idx];
+    if (art && !art._esana) { // Esana already handles its own type
+      const videoUrl = document.getElementById('videoUrl')?.value?.trim() || '';
+      const imageUrl = document.getElementById('imageUrl')?.value?.trim() || art.urlToImage || '';
+      const hasExtractedVideo = !!selectedExtractedVideo;
+
+      if (hasExtractedVideo || videoUrl) {
+        // Has video — switch to video post type
+        if (currentPostType !== 'video') {
+          const vBtn = document.getElementById('ptVideo');
+          if (vBtn) setPostType('video', vBtn);
+          log('Auto-detected: switching to Video post', 'inf');
+        }
+      } else if (imageUrl) {
+        // Has image — switch to image post type
+        if (currentPostType !== 'image') {
+          const iBtn = document.getElementById('ptImage');
+          if (iBtn) setPostType('image', iBtn);
+          document.getElementById('imageUrl').value = imageUrl;
+          log('Auto-detected: switching to Image post', 'inf');
+        }
+      }
+      // else: text+link (default)
+    }
+  }
+
   let successCount = 0;
   for (const acc of targets) {
     try {
@@ -1793,15 +1822,40 @@ async function fetchNews(){
       rawArticles = [...(searchData.articles||[]), ...topArts];
     }
 
-    // Dedupe
+    // Dedupe incoming articles
     const seen = new Set();
-    articles = rawArticles.filter(a => {
+    const freshArticles = rawArticles.filter(a => {
       if (!a.title || a.title === '[Removed]' || seen.has(a.url)) return false;
       seen.add(a.url); return true;
     });
 
+    // ── REALTIME MERGE: Add only NEW articles, preserve selection ──
+    if(articles.length > 0) {
+      const existingUrls = new Set(articles.map(a => a.url));
+      const newArts = freshArticles.filter(a => !existingUrls.has(a.url));
+
+      if(newArts.length) {
+        // Prepend new articles, keep selected article in place
+        const prevSelUrl = selIdx !== null ? articles[selIdx]?.url : null;
+        articles = [...newArts, ...articles].slice(0, 150);
+        if(prevSelUrl) {
+          const newIdx = articles.findIndex(a => a.url === prevSelUrl);
+          if(newIdx >= 0) selIdx = newIdx;
+        }
+        log(`⚡ ${newArts.length} new article(s) — feed updated`, 'ok');
+        // Flash feed title green
+        const feedTitle = document.querySelector('.feed-bar-title');
+        if(feedTitle){ feedTitle.style.color='var(--green)'; setTimeout(()=>feedTitle.style.color='',1500); }
+      } else {
+        log(`✓ Feed up to date — ${articles.length} articles`, 'inf');
+      }
+    } else {
+      // First load
+      articles = freshArticles;
+      log(`✓ ${articles.length} articles loaded`, 'ok');
+    }
+
     document.getElementById('sFetched').textContent = articles.length;
-    log(`✓ ${articles.length} articles via ${PROVIDER_NAMES[provider]}`, 'ok');
 
     if (document.getElementById('tgAiAuto').classList.contains('on')) {
       log('AI caption mode: ON — will generate on select', 'inf');
@@ -2252,30 +2306,11 @@ function downloadSelectedExtracted() {
 async function downloadExtractedVideo(url, label) {
   const isYT = url.includes('youtube.com') || url.includes('youtu.be');
   if(isYT) {
-    // Use Netlify function to get direct URL first
-    toast('🔍 Getting download URL…', 'inf');
-    log('Getting YouTube direct download URL…','inf');
-    try {
-      const res = await fetch('/api/yt/download', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ url })
-      });
-      const data = await res.json();
-      if(data.status === 'url_only' && data.directUrl) {
-        const fname = `${(data.videoTitle||label).replace(/[^a-z0-9]/gi,'_')}_${data.quality||'720p'}.mp4`;
-        triggerDownload(data.directUrl, fname);
-        toast(`Downloading: ${data.videoTitle||label}`, 'ok');
-        log(`⬇️ Downloading: ${data.videoTitle} (${data.quality})`, 'ok');
-      } else {
-        throw new Error(data.error || 'Could not get download URL');
-      }
-    } catch(err) {
-      toast('Download failed: '+err.message, 'err');
-      log('Download failed: '+err.message, 'err');
-    }
+    // YouTube blocks all server-side downloaders — use browser-based tool
+    showYtDlModal(url, `https://cobalt.tools/#${encodeURIComponent(url)}`);
   } else {
-    // Direct file — trigger download immediately
-    const fname = url.split('/').pop()?.split('?')[0] || `${label.replace(/[^a-z0-9]/gi,'_')}.mp4`;
+    // Direct file — proxy download through Netlify
+    const fname = url.split('/').pop()?.split('?')[0] || `${(label||'video').replace(/[^a-z0-9]/gi,'_')}.mp4`;
     triggerDownload(url, fname);
     toast('Download started ✓', 'ok');
     log(`⬇️ Downloading: ${fname}`, 'ok');
@@ -2824,18 +2859,18 @@ async function postVideoToFB(articleIdx, cap, injectedAcc) {
     } catch(err) {
       clearInterval(ytTimer);
       log(`⚠ YT direct upload failed (${err.message}) — falling back to embedded link`, 'inf');
-      showProgress(88, 'Posting as embedded link…');
+      showProgress(88, 'Posting as embedded YouTube link…');
       try {
         const res = await fetch('/api/fb/post', {
           method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ pageId:fbPageId, message:cap, link:videoUrl, access_token:fbToken })
+          body: JSON.stringify({ pageId:fbPageId, message:cap + '\n\n▶ ' + videoUrl, access_token:fbToken })
         });
         const data = await res.json();
         if(data.error) throw new Error(data.error.message);
-        showProgress(100, '✓ Posted as embedded YouTube link');
+        showProgress(100, '✓ Posted as YouTube link');
         setTimeout(hideProgress, 2500);
         markPosted(a, data.id, articleIdx);
-        toast('Posted as embedded link (direct upload failed)', 'ok');
+        toast('Posted! (YouTube link — FB will embed it)', 'ok');
         return true;
       } catch(err2) {
         hideProgress();
@@ -3315,21 +3350,18 @@ async function downloadVideoToDevice() {
 
   try {
     if(isYT) {
-      // Use our Netlify function to extract direct URL (no FB posting)
-      log('🔍 Extracting YouTube direct download URL…','inf');
-      const res = await fetch('/api/yt/download', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ url }) // no pageId/access_token = url_only mode
-      });
-      const data = await res.json();
+      // YouTube blocks all server-side downloaders — use cobalt.tools in browser instead
+      // It runs client-side in the user's browser which bypasses server IP blocks
+      log('🔗 Opening cobalt.tools for YouTube download…','inf');
 
-      if(data.status === 'url_only' && data.directUrl) {
-        log(`✓ Got direct URL: ${data.videoTitle} (${data.quality})`, 'ok');
-        triggerDownload(data.directUrl, `${(data.videoTitle||'video').replace(/[^a-z0-9]/gi,'_')}_${data.quality||'720p'}.mp4`);
-        toast(`Downloading: ${data.videoTitle||'video'} (${data.quality||''})`, 'ok');
-      } else {
-        throw new Error(data.error || 'Could not extract download URL');
-      }
+      const encodedUrl = encodeURIComponent(url);
+      // Try cobalt.tools first (best quality, no ads)
+      const cobaltUrl = `https://cobalt.tools/#${encodedUrl}`;
+
+      // Show a choice modal
+      showYtDlModal(url, cobaltUrl);
+      if(btn){ btn.disabled=false; btn.textContent='⬇️ Download Video to Device'; }
+      return;
     } else {
       // Direct URL — just download it directly
       log(`⬇️ Downloading: ${url.slice(0,60)}…`, 'inf');
@@ -3343,6 +3375,44 @@ async function downloadVideoToDevice() {
   } finally {
     if(btn){ btn.disabled=false; btn.textContent='⬇️ Download Video to Device'; }
   }
+}
+
+function showYtDlModal(ytUrl, cobaltUrl) {
+  // Remove any existing modal
+  document.getElementById('ytDlModal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'ytDlModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:20px;max-width:340px;width:100%;">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);font-weight:700;margin-bottom:6px;letter-spacing:1px;">⬇️ DOWNLOAD YOUTUBE VIDEO</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:14px;line-height:1.7;">
+        YouTube blocks server-side downloads.<br>Use one of these free browser-based tools:
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+        <button onclick="window.open('${cobaltUrl}','_blank');document.getElementById('ytDlModal').remove();"
+          style="padding:10px;border:1px solid var(--green);background:rgba(45,214,113,0.1);color:var(--green);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;text-align:left;">
+          ✅ cobalt.tools — best quality, no ads<br>
+          <span style="font-size:8px;opacity:0.7;">Opens with your link pre-filled</span>
+        </button>
+        <button onclick="window.open('https://ssyoutube.com/watch?v=${ytUrl.match(/[?&]v=([^&]+)/)?.[1]||ytUrl.split('/').pop()}','_blank');document.getElementById('ytDlModal').remove();"
+          style="padding:10px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;text-align:left;">
+          📥 ssyoutube.com — simple, fast<br>
+          <span style="font-size:8px;opacity:0.7;">Add 'ss' before 'youtube' in the URL</span>
+        </button>
+        <button onclick="navigator.clipboard?.writeText('${ytUrl}').then(()=>toast('URL copied!','ok'));document.getElementById('ytDlModal').remove();"
+          style="padding:10px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;text-align:left;">
+          📋 Copy URL — paste in downloader app
+        </button>
+      </div>
+      <button onclick="document.getElementById('ytDlModal').remove();"
+        style="width:100%;padding:8px;border:1px solid var(--border2);background:transparent;color:var(--muted2);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:9px;cursor:pointer;">
+        CANCEL
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
 }
 
 async function triggerDownload(url, filename) {
@@ -3410,7 +3480,7 @@ function showVideoUploadMode(url) {
     icon  = '🎬';
     title = 'YouTube video';
     body  = 'Will <b>extract direct URL & upload as native Facebook video</b>. Falls back to embedded link if upload fails.';
-    tip   = '💡 Max 20 min • ⬇️ Use Download button to save to device';
+    tip   = '⬇️ Download button opens cobalt.tools in browser (server-side blocked by YouTube)';
     showDlBtn(true);
   } else if(isVim) {
     cls   = 'vim';
@@ -3586,6 +3656,20 @@ function selectArtMobile(i) {
 
 // Patch selectArt calls to use mobile version
 document.addEventListener('DOMContentLoaded', () => {
+  // ── INIT: Set 'war' as default keyword and fetch on load ──
+  const sq = document.getElementById('searchQ');
+  if(sq) sq.value = 'war OR conflict OR Ukraine OR Gaza OR ceasefire OR airstrike';
+
+  // Auto-fetch on load
+  setTimeout(() => {
+    fetchNews();
+    // Start real-time auto-refresh every 2 minutes
+    if(!autoRefreshTimer) {
+      autoRefreshTimer = setInterval(fetchNews, 2 * 60 * 1000);
+      log('⏱ Real-time feed active — refreshing every 2 min', 'ok');
+    }
+  }, 300);
+
   // Init mobile on load
   if (window.innerWidth <= 768) {
     mobSwitch('feed');

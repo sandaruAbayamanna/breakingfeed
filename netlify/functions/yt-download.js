@@ -1,134 +1,144 @@
-// yt-download.js — YouTube video direct URL extractor
-// Zero dependencies — uses YouTube's internal API (innertube) directly
-// No npm packages needed
+// yt-download.js — YouTube video URL extractor
+// Zero npm dependencies — uses multiple methods with fallbacks
 
 exports.handler = async function (event) {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 200, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "POST, OPTIONS" }, body: "" };
   }
-
   const headers = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
 
   try {
     const { url, pageId, access_token, caption, title: postTitle } = JSON.parse(event.body || "{}");
     if (!url) return { statusCode: 400, headers, body: JSON.stringify({ error: "Missing url" }) };
 
-    // Extract video ID
     const videoId = extractVideoId(url);
-    if (!videoId) throw new Error("Could not extract YouTube video ID from URL");
+    if (!videoId) throw new Error("Could not extract YouTube video ID from: " + url);
 
     console.log(`[yt-dl] Video ID: ${videoId}`);
 
-    // ── METHOD 1: YouTube Innertube API (no key needed) ──
-    let formats = [];
-    let videoTitle = "";
-    let duration = 0;
-
+    // ── METHOD 1: cobalt.tools public API — free, no key needed ──
     try {
-      const innertubeRes = await fetchT("https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8", 10000, {
+      console.log("[yt-dl] Trying cobalt.tools…");
+      const cobaltRes = await fetchT("https://api.cobalt.tools/", 12000, {
         "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "X-YouTube-Client-Name": "1",
-        "X-YouTube-Client-Version": "2.20231121.08.00",
+        "Accept": "application/json",
       }, "POST", JSON.stringify({
-        videoId,
-        context: {
-          client: {
-            clientName: "ANDROID",
-            clientVersion: "19.09.37",
-            androidSdkVersion: 30,
-            userAgent: "com.google.android.youtube/19.09.37 (Linux; U; Android 11)",
-            hl: "en",
-            timeZone: "UTC",
-            utcOffsetMinutes: 0
-          }
-        }
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        downloadMode: "auto",
+        videoQuality: "720",
       }));
 
-      const innertubeData = await innertubeRes.json();
-      videoTitle = innertubeData?.videoDetails?.title || "";
-      duration   = parseInt(innertubeData?.videoDetails?.lengthSeconds || 0);
+      const cobaltText = await cobaltRes.text();
+      console.log(`[yt-dl] Cobalt status: ${cobaltRes.status}, body: ${cobaltText.slice(0,100)}`);
 
-      const streamingData = innertubeData?.streamingData;
-      if (streamingData?.formats) formats.push(...streamingData.formats);
-      if (streamingData?.adaptiveFormats) formats.push(...streamingData.adaptiveFormats);
-      console.log(`[yt-dl] Innertube: "${videoTitle}", ${formats.length} formats`);
-    } catch(e) {
-      console.log("[yt-dl] Innertube failed:", e.message);
-    }
-
-    // ── METHOD 2: yt-dlp public API proxy (cobalt.tools) ──
-    if (!formats.length) {
-      try {
-        const cobaltRes = await fetchT("https://api.cobalt.tools/api/json", 12000, {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        }, "POST", JSON.stringify({
-          url: `https://www.youtube.com/watch?v=${videoId}`,
-          vQuality: "720",
-          isNoTTWatermark: true,
-        }));
-        const cobaltData = await cobaltRes.json();
-        console.log("[yt-dl] Cobalt response:", JSON.stringify(cobaltData).slice(0, 200));
-
-        if (cobaltData.url || cobaltData.urls) {
-          const directUrl = cobaltData.url || cobaltData.urls;
-          return await postOrReturn({ directUrl, videoTitle: videoTitle || videoId, quality: "720p", pageId, access_token, caption, postTitle, headers });
+      if (cobaltRes.ok) {
+        const cobaltData = JSON.parse(cobaltText);
+        // Cobalt returns: { status: "tunnel"|"redirect"|"picker", url, ... }
+        if ((cobaltData.status === "tunnel" || cobaltData.status === "redirect") && cobaltData.url) {
+          console.log(`[yt-dl] Cobalt success: ${cobaltData.url.slice(0,60)}`);
+          return await postOrReturn({
+            directUrl: cobaltData.url, videoTitle: cobaltData.filename || videoId,
+            quality: "720p", pageId, access_token, caption, postTitle, headers
+          });
         }
-      } catch(e) {
-        console.log("[yt-dl] Cobalt failed:", e.message);
       }
-    }
+    } catch(e) { console.log("[yt-dl] Cobalt failed:", e.message); }
 
-    // ── Pick best format from innertube ──
-    if (formats.length) {
-      // Filter: mp4, has both audio+video (mimeType not adaptive), max 720p
-      const combined = formats.filter(f =>
-        f.mimeType?.includes("video/mp4") &&
-        f.audioQuality && // has audio
-        parseInt(f.height || 0) <= 720
-      ).sort((a, b) => parseInt(b.height||0) - parseInt(a.height||0));
-
-      const best = combined[0] || formats.find(f => f.mimeType?.includes("video/mp4")) || formats[0];
-
-      if (best?.url) {
-        const quality = best.qualityLabel || `${best.height}p` || "?";
-        const sizeMB  = best.contentLength ? `${(parseInt(best.contentLength)/1024/1024).toFixed(1)}MB` : "?";
-        console.log(`[yt-dl] Best format: ${quality}, ${sizeMB}`);
-        return await postOrReturn({ directUrl: best.url, videoTitle, quality, approxSize: sizeMB, pageId, access_token, caption, postTitle, headers });
+    // ── METHOD 2: yt-dlp via loader.to API ──
+    try {
+      console.log("[yt-dl] Trying loader.to…");
+      const loaderRes = await fetchT(
+        `https://loader.to/api/button/?url=https://www.youtube.com/watch?v=${videoId}&f=mp4&color=ff0000`,
+        10000, { "Accept": "application/json", "User-Agent": "Mozilla/5.0" }
+      );
+      const loaderText = await loaderRes.text();
+      console.log(`[yt-dl] loader.to: ${loaderText.slice(0,100)}`);
+      if (loaderRes.ok) {
+        const loaderData = JSON.parse(loaderText);
+        if (loaderData.id) {
+          // Poll for download URL
+          for (let i = 0; i < 8; i++) {
+            await sleep(2000);
+            const pollRes = await fetchT(
+              `https://loader.to/api/info/?id=${loaderData.id}`,
+              8000, { "Accept": "application/json" }
+            );
+            const pollData = await pollRes.json();
+            console.log(`[yt-dl] loader.to poll ${i}: ${JSON.stringify(pollData).slice(0,100)}`);
+            if (pollData.download_url || pollData.success) {
+              const dlUrl = pollData.download_url;
+              if (dlUrl) {
+                return await postOrReturn({
+                  directUrl: dlUrl, videoTitle: videoId, quality: "mp4",
+                  pageId, access_token, caption, postTitle, headers
+                });
+              }
+            }
+          }
+        }
       }
-    }
+    } catch(e) { console.log("[yt-dl] loader.to failed:", e.message); }
 
-    throw new Error("Could not extract a downloadable URL from this video");
+    // ── METHOD 3: y2mate-style API ──
+    try {
+      console.log("[yt-dl] Trying y2api…");
+      const y2Res = await fetchT("https://yt6s.com/api/ajaxSearch", 10000, {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0",
+        "Referer": "https://yt6s.com/",
+      }, "POST", `q=https://www.youtube.com/watch?v=${videoId}&vt=home`);
+
+      const y2Text = await y2Res.text();
+      console.log(`[yt-dl] y2api: ${y2Text.slice(0,150)}`);
+      if (y2Res.ok) {
+        const y2Data = JSON.parse(y2Text);
+        // Look for mp4 download link in the response
+        const links = y2Data?.links?.mp4 || {};
+        const link360 = links["360p"] || links["480p"] || links["720p"] || Object.values(links)[0];
+        if (link360?.k) {
+          // Need to convert key to URL
+          const convertRes = await fetchT("https://yt6s.com/api/ajaxConvert", 10000, {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": "https://yt6s.com/",
+          }, "POST", `vid=${videoId}&k=${encodeURIComponent(link360.k)}`);
+          const convertData = await convertRes.json();
+          if (convertData?.dlink) {
+            return await postOrReturn({
+              directUrl: convertData.dlink, videoTitle: y2Data.title || videoId,
+              quality: "360p", pageId, access_token, caption, postTitle, headers
+            });
+          }
+        }
+      }
+    } catch(e) { console.log("[yt-dl] y2api failed:", e.message); }
+
+    // ── All methods failed ──
+    throw new Error("All download methods failed. YouTube may be blocking automated downloads. Try a direct .mp4 URL instead.");
 
   } catch (err) {
-    console.error("[yt-dl] Error:", err.message);
+    console.error("[yt-dl] Final error:", err.message);
     return { statusCode: 200, headers, body: JSON.stringify({ status: "error", error: err.message }) };
   }
 };
 
-// ── Post to FB or just return the URL ──
 async function postOrReturn({ directUrl, videoTitle, quality, approxSize, pageId, access_token, caption, postTitle, headers }) {
   if (!pageId || !access_token) {
-    // Just return the URL for device download
     return { statusCode: 200, headers, body: JSON.stringify({ status: "url_only", directUrl, videoTitle, quality, approxSize }) };
   }
-
-  // Try FB file_url (FB downloads it themselves)
   try {
     const fbRes = await fetchT(`https://graph.facebook.com/v19.0/${pageId}/videos`, 20000, {
       "Content-Type": "application/json"
     }, "POST", JSON.stringify({
       file_url: directUrl,
       description: caption || `📺 ${videoTitle}`,
-      title: (postTitle || videoTitle).slice(0, 80),
+      title: (postTitle || videoTitle || "").slice(0, 80),
       access_token,
     }));
     const fbData = await fbRes.json();
     if (!fbData.error && fbData.id) {
       return { statusCode: 200, headers, body: JSON.stringify({ status: "ok", id: fbData.id, videoTitle, quality, directUrl }) };
     }
-    // Return error + directUrl so frontend can try binary upload
     return { statusCode: 200, headers, body: JSON.stringify({ status: "fb_error", error: fbData.error, directUrl, videoTitle, quality }) };
   } catch(e) {
     return { statusCode: 200, headers, body: JSON.stringify({ status: "fb_error", error: { message: e.message }, directUrl, videoTitle, quality }) };
@@ -137,10 +147,11 @@ async function postOrReturn({ directUrl, videoTitle, quality, approxSize, pageId
 
 function extractVideoId(url) {
   const patterns = [
-    /youtu\.be\/([^?&/#]+)/,
+    /youtu\.be\/([^?&#/]+)/,
     /youtube\.com\/watch\?v=([^&]+)/,
-    /youtube\.com\/shorts\/([^?&/#]+)/,
-    /youtube\.com\/embed\/([^?&/#]+)/,
+    /youtube\.com\/shorts\/([^?&#/]+)/,
+    /youtube\.com\/embed\/([^?&#/]+)/,
+    /youtube\.com\/live\/([^?&#/]+)/,
   ];
   for (const p of patterns) {
     const m = url.match(p);
@@ -149,13 +160,15 @@ function extractVideoId(url) {
   return null;
 }
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 async function fetchT(url, ms, extraHeaders = {}, method = "GET", body = null) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
     return await fetch(url, {
       method, signal: controller.signal,
-      headers: { "User-Agent": "Mozilla/5.0", ...extraHeaders },
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", ...extraHeaders },
       ...(body ? { body } : {}),
     });
   } finally { clearTimeout(timer); }
