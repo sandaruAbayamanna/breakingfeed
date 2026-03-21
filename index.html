@@ -888,9 +888,9 @@ select.inp{cursor:pointer;}
       </div>
       <div class="chip-row" id="chipRow">
         <div class="chip on" data-v="war">⚔ War</div>
-        <div class="chip on" data-v="conflict">💥 Conflict</div>
-        <div class="chip on" data-v="Gaza">🇵🇸 Gaza</div>
-        <div class="chip on" data-v="Ukraine">🇺🇦 Ukraine</div>
+        <div class="chip" data-v="conflict">💥 Conflict</div>
+        <div class="chip" data-v="Gaza">🇵🇸 Gaza</div>
+        <div class="chip" data-v="Ukraine">🇺🇦 Ukraine</div>
         <div class="chip" data-v="military">🪖 Military</div>
         <div class="chip" data-v="airstrike">✈ Airstrike</div>
         <div class="chip" data-v="ceasefire">🕊 Ceasefire</div>
@@ -3656,9 +3656,10 @@ function selectArtMobile(i) {
 
 // Patch selectArt calls to use mobile version
 document.addEventListener('DOMContentLoaded', () => {
-  // ── INIT: Set 'war' as default keyword and fetch on load ──
+  // ── INIT: Sync searchQ from chip state (only War on by default) ──
+  const initVals = [...document.querySelectorAll('.chip.on')].map(x => x.dataset.v);
   const sq = document.getElementById('searchQ');
-  if(sq) sq.value = 'war OR conflict OR Ukraine OR Gaza OR ceasefire OR airstrike';
+  if(sq) sq.value = initVals.join(' OR ') || 'war';
 
   // Auto-fetch on load
   setTimeout(() => {
