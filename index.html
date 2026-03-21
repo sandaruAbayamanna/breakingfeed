@@ -956,9 +956,9 @@ select.inp{cursor:pointer;}
         <button class="ftab on" onclick="setTab('all',this)">ALL</button>
         <button class="ftab" onclick="setTab('breaking',this)">🚨 BREAKING</button>
         <button class="ftab" onclick="setTab('top',this)">🔥 TOP</button>
+        <button class="ftab" onclick="setTab('video',this)">🎬 VIDEO</button>
         <button class="ftab" onclick="setTab('lk',this)">🇱🇰 SRI LANKA</button>
         <button class="ftab" onclick="setTab('lk_si',this)">🇱🇰 සිංහල</button>
-        <button class="ftab" onclick="setTab('video',this)">📹 MEDIA</button>
         <button class="ftab" onclick="setTab('unposted',this)">⏳ UNPOSTED</button>
       </div>
     </div>
@@ -1674,9 +1674,8 @@ function isBreaking(a){
 function isTop(a){
   return TOP_SRCS.some(s=>a.source.name.toLowerCase().includes(s.toLowerCase()));
 }
-function hasMedia(a){
-  return !!a.urlToImage;
-}
+function hasMedia(a){ return !!(a.urlToImage || a.video_url); }
+function hasVideo(a){ return !!(a.video_url || a._hasVideo); }
 function timeAgo(ds){
   const s=(Date.now()-new Date(ds))/1000;
   if(s<60)return `${~~s}s ago`;
@@ -1885,7 +1884,7 @@ function renderFeed(){
   let arts=articles;
   if(currentTab==='breaking') arts=arts.filter(isBreaking);
   else if(currentTab==='top') arts=arts.filter(a=>a._top||isTop(a));
-  else if(currentTab==='video') arts=arts.filter(hasMedia);
+  else if(currentTab==='video') arts=arts.filter(hasVideo);
   else if(currentTab==='unposted') arts=arts.filter(a=>!postedUrls.has(a.url));
   else if(currentTab==='lk') arts=arts.filter(a=>LK_SOURCES_EN.has(a.source?.name));
   else if(currentTab==='lk_si') arts=arts.filter(a=>LK_SOURCES_SI.has(a.source?.name));
@@ -1909,7 +1908,7 @@ function renderFeed(){
           <div class="card-badges">
             ${brk?'<span class="badge brk">⚡ BREAKING</span>':''}
             ${top?'<span class="badge top">🔥 TOP</span>':''}
-            ${a.urlToImage?'<span class="badge vid">📷 MEDIA</span>':''}
+            ${a.video_url||a._hasVideo?'<span class="badge vid" style="background:rgba(220,38,38,0.15);color:var(--red);border-color:var(--red);">🎬 VIDEO</span>':a.urlToImage?'<span class="badge vid">📷 IMG</span>':''}
             ${a._esana?'<span class="badge" style="background:rgba(255,140,0,0.15);color:#ff8c00;border-color:rgba(255,140,0,0.4);">හෙළකුරු</span>':''}
             ${posted?'<span class="badge posted-badge">✓ POSTED</span>':''}
             <span class="badge src">${a.source.name}</span>
@@ -1937,8 +1936,9 @@ function setTab(tab,btn){
   currentTab=tab;
   // Update feed title
   const titles = {all:'GLOBAL FEED',breaking:'🚨 BREAKING NEWS',top:'🔥 TOP STORIES',
+    video:'🎬 VIDEO FEED',
     lk:'🇱🇰 SRI LANKA NEWS (English)',lk_si:'🇱🇰 ශ්‍රී ලංකා පුවත් (සිංහල)',
-    video:'📹 MEDIA FEED',unposted:'⏳ UNPOSTED'};
+    unposted:'⏳ UNPOSTED'};
   const titleEl = document.querySelector('.feed-bar-title');
   if(titleEl) titleEl.textContent = titles[tab] || 'FEED';
   // Auto-fetch when switching to Sinhala tab so it loads with no keyword
@@ -2011,13 +2011,20 @@ function selectArt(i){
     if(ep) ep.style.display = 'none';
   }
   document.getElementById('mediaUrl').value = a.url||'';
-  document.getElementById('videoUrl').value = '';
+  document.getElementById('videoUrl').value = a.video_url || '';
+  if(a.video_url) showVideoUploadMode(a.video_url);
   document.getElementById('videoTitle').value = '';
   clearVideoFile();
   hideProgress();
   // Reset extraction state
   extractedVideos=[];
   selectedExtractedVideo=null;
+  // If article has a direct video URL, switch to URL tab in video panel
+  if(a.video_url) {
+    setVideoTab('url', document.getElementById('vtUrl'));
+    const dlBtn = document.getElementById('dlExtractBtn');
+    if(dlBtn) dlBtn.style.display = 'none';
+  }
   const vr=document.getElementById('videoResults');
   const vs=document.getElementById('selectedVideoPrev');
   const es=document.getElementById('extractStatus');

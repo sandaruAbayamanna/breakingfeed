@@ -221,14 +221,22 @@ async function fetchWithTimeout(url, ms, extraHeaders = {}) {
 // NORMALISE rss2json.com response
 // ══════════════════════════════════════════
 function normaliseRss2json(item, sourceName) {
+  const enc = item.enclosure || {};
+  const isVideoEnc = enc.type && enc.type.includes('video');
+  const videoUrl = isVideoEnc ? enc.link : extractVideoFromHtml(item.description || item.content || '');
+  const imageUrl = (!isVideoEnc && enc.link && enc.type?.includes('image') ? enc.link : null)
+                || item.thumbnail
+                || extractImageFromHtml(item.description || item.content || '');
   return {
-    title:       clean(item.title || ""),
-    description: clean(stripHtml(item.description || item.content || "")).slice(0, 300),
-    url:         item.link || item.guid || "",
-    urlToImage:  item.thumbnail || item.enclosure?.link || extractImageFromHtml(item.description || ""),
+    title:       clean(item.title || ''),
+    description: clean(stripHtml(item.description || item.content || '')).slice(0, 300),
+    url:         item.link || item.guid || '',
+    urlToImage:  imageUrl,
+    video_url:   videoUrl || null,
     publishedAt: normalizeDate(item.pubDate),
     source:      { name: sourceName },
-    _provider:   "rss",
+    _provider:   'rss',
+    _hasVideo:   !!videoUrl,
   };
 }
 
@@ -250,14 +258,17 @@ function parseXML(xml, sourceName) {
 
       if (!title || !link) continue;
 
+      const videoUrl = extractVideoUrl(block);
       articles.push({
         title,
         description: desc.slice(0, 300),
         url:         link.trim(),
-        urlToImage:  image,
+        urlToImage:  videoUrl ? null : image,  // if has video, image is secondary
+        video_url:   videoUrl || null,
         publishedAt: normalizeDate(date),
         source:      { name: sourceName },
-        _provider:   "rss",
+        _provider:   'rss',
+        _hasVideo:   !!videoUrl,
       });
     } catch {}
   }
@@ -286,13 +297,51 @@ function extractAttr(xml, tag, attr) {
 
 function extractImage(xml) {
   const patterns = [
-    /media:content[^>]+url=["']([^"']+\.(jpg|jpeg|png|webp)[^"']*)["']/i,
+    /media:content[^>]+url=["']([^"']+\.(jpg|jpeg|png|webp)[^"']*)["'](?![^>]*type=["']video)/i,
     /media:thumbnail[^>]+url=["']([^"']+)["']/i,
-    /enclosure[^>]+url=["']([^"']+\.(jpg|jpeg|png|webp)[^"']*)["']/i,
+    /enclosure[^>]+url=["']([^"']+\.(jpg|jpeg|png|webp)[^"']*)["'][^>]*type=["']image/i,
   ];
   for (const p of patterns) {
     const m = xml.match(p);
     if (m) return m[1];
+  }
+  return null;
+}
+
+// Extract direct video URL from RSS item XML
+function extractVideoUrl(xml) {
+  const patterns = [
+    // enclosure with video type
+    /enclosure[^>]+url=["']([^"']+\.(?:mp4|webm|mov|m3u8|ts)[^"']*)["']/i,
+    /enclosure[^>]+type=["']video[^"']*["'][^>]*url=["']([^"']+)["']/i,
+    /enclosure[^>]+url=["']([^"']+)["'][^>]*type=["']video/i,
+    // media:content with video type
+    /media:content[^>]+url=["']([^"']+\.(?:mp4|webm|mov|m3u8)[^"']*)["']/i,
+    /media:content[^>]+type=["']video[^"']*["'][^>]*url=["']([^"']+)["']/i,
+    /media:content[^>]+url=["']([^"']+)["'][^>]*type=["']video/i,
+    // media:video
+    /media:video[^>]+url=["']([^"']+)["']/i,
+    // jwplayer or similar embed patterns
+    /file:\s*["']([^"']+\.(?:mp4|webm|m3u8)[^"']*)["']/i,
+  ];
+  for (const p of patterns) {
+    const m = xml.match(p);
+    if (m?.[1]) return m[1].trim();
+  }
+  return null;
+}
+
+// Extract video URL embedded in HTML description
+function extractVideoFromHtml(html) {
+  const patterns = [
+    /<video[^>]+src=["']([^"']+\.(?:mp4|webm|mov)[^"']*)["']/i,
+    /source[^>]+src=["']([^"']+\.(?:mp4|webm|mov)[^"']*)["']/i,
+    /"contentUrl"\s*:\s*"([^"]+\.(?:mp4|webm|mov)[^"]*)"/i,
+    /videoUrl["\s]*:\s*["']([^"']+\.(?:mp4|webm)[^"']*)["']/i,
+  ];
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m?.[1]) return m[1];
   }
   return null;
 }
