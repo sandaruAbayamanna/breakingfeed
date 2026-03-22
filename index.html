@@ -1990,22 +1990,28 @@ function selectArt(i){
   const langEnBtn = document.getElementById('langEn');
   if(langEnBtn) setLang('en', langEnBtn);
 
-  // Esana: auto-switch to Image post with rich caption; others: default text
+  // Auto-switch post type — don't pre-fill media if already posted
+  const isPosted = postedUrls.has(a.url);
   if(a._esana) {
     setPostType('image', document.getElementById('ptImage'));
-    document.getElementById('imageUrl').value = a.urlToImage||'';
-    if(a.urlToImage) {
-      setTimeout(() => {
-        previewImageUrl();
-        const modeEl = document.getElementById('imageUploadMode');
-        if(modeEl){ modeEl.style.display='block'; modeEl.textContent='✓ Article image will be uploaded directly to Facebook'; }
-      }, 50);
+    if(!isPosted) {
+      document.getElementById('imageUrl').value = a.urlToImage||'';
+      if(a.urlToImage) {
+        setTimeout(() => {
+          previewImageUrl();
+          const modeEl = document.getElementById('imageUploadMode');
+          if(modeEl){ modeEl.style.display='block'; modeEl.textContent='✓ Article image will be uploaded directly to Facebook'; }
+        }, 50);
+      }
+    } else {
+      document.getElementById('imageUrl').value = '';
     }
     // Show Esana rich preview panel
     showEsanaPreview(a);
   } else {
     setPostType('text', document.getElementById('ptText'));
-    document.getElementById('imageUrl').value = a.urlToImage||'';
+    // Only pre-fill image if not already posted
+    document.getElementById('imageUrl').value = isPosted ? '' : (a.urlToImage||'');
     // Hide Esana preview panel
     const ep = document.getElementById('esanaPreviewWrap');
     if(ep) ep.style.display = 'none';
@@ -2157,8 +2163,11 @@ function setPostType(type, btn) {
   document.getElementById('panelVideo').style.display = type==='video' ? 'block' : 'none';
   // Auto-load article image when switching to image mode
   if(type === 'image' && selIdx !== null) {
-    const img = articles[selIdx]?.urlToImage;
-    if(img && !document.getElementById('imageUrl').value) {
+    const art = articles[selIdx];
+    const img = art?.urlToImage;
+    const alreadyPosted = art && postedUrls.has(art.url);
+    // Only auto-fill if field is empty AND article hasn't been posted yet
+    if(img && !document.getElementById('imageUrl').value && !alreadyPosted) {
       document.getElementById('imageUrl').value = img;
       previewImageUrl();
       document.getElementById('imageUploadMode').style.display = 'block';
@@ -3015,6 +3024,73 @@ function markPosted(a, fbId, articleIdx){
   toast(currentPostType==='video'?'Video posted to Facebook! 🎬':'Posted to Facebook!','ok');
   renderFeed();
   addToQueue(a.title, fbId||'OK', 'done');
+  // Clear composer after successful post
+  clearComposer();
+}
+
+function clearComposer() {
+  // Reset caption
+  document.getElementById('captionBox').value = '';
+  const capEn = document.getElementById('captionEn');
+  const capSi = document.getElementById('captionSi');
+  if(capEn) capEn.value = '';
+  if(capSi) capSi.value = '';
+
+  // Reset post type to text+link
+  const ptText = document.getElementById('ptText');
+  if(ptText) setPostType('text', ptText);
+
+  // Clear image fields
+  document.getElementById('imageUrl').value = '';
+  document.getElementById('mediaUrl').value = '';
+  const mediaPrev = document.getElementById('mediaPrev');
+  if(mediaPrev){ mediaPrev.style.display='none'; mediaPrev.innerHTML=''; }
+  const imgUpMode = document.getElementById('imageUploadMode');
+  if(imgUpMode){ imgUpMode.style.display='none'; imgUpMode.textContent=''; }
+  const imgResults = document.getElementById('imageResults');
+  if(imgResults){ imgResults.style.display='none'; imgResults.innerHTML=''; }
+
+  // Clear video fields
+  document.getElementById('videoUrl').value = '';
+  document.getElementById('videoTitle').value = '';
+  selectedExtractedVideo = null;
+  extractedVideos = [];
+  const vr = document.getElementById('videoResults');
+  const vs = document.getElementById('selectedVideoPrev');
+  const es = document.getElementById('extractStatus');
+  const dlBtn = document.getElementById('dlExtractBtn');
+  if(vr){ vr.innerHTML=''; vr.style.display='none'; }
+  if(vs){ vs.innerHTML=''; vs.style.display='none'; }
+  if(es){ es.style.display='none'; }
+  if(dlBtn) dlBtn.style.display='none';
+  const vidUpMode = document.getElementById('videoUploadMode');
+  if(vidUpMode){ vidUpMode.style.display='none'; vidUpMode.className=''; }
+  const dlVideoBtn = document.getElementById('dlVideoBtn');
+  if(dlVideoBtn) dlVideoBtn.style.display='none';
+
+  // Clear Esana preview
+  const esanaPrev = document.getElementById('esanaPreviewWrap');
+  if(esanaPrev) esanaPrev.style.display='none';
+
+  // Reset FB mock preview
+  const fbCapPrev = document.getElementById('fbCapPrev');
+  if(fbCapPrev) fbCapPrev.textContent='Your caption appears here…';
+  const fbMediaPrev = document.getElementById('fbMediaPrev');
+  if(fbMediaPrev) fbMediaPrev.innerHTML='';
+
+  // Hide progress
+  hideProgress();
+
+  // Reset language to English
+  const langEn = document.getElementById('langEn');
+  if(langEn) setLang('en', langEn);
+
+  // Deselect article
+  selIdx = null;
+  const apBox = document.getElementById('apBox');
+  if(apBox) apBox.innerHTML='<div style="font-family:JetBrains Mono,monospace;font-size:10px;color:var(--muted2);padding:8px;">Select an article from the feed to compose a post.</div>';
+
+  log('Composer cleared — ready for next post', 'inf');
 }
 
 
