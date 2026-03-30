@@ -1737,7 +1737,7 @@ function onProviderChange() {
 // Run on load
 document.addEventListener('DOMContentLoaded', onProviderChange);
 
-async function fetchNews(silent = false){
+async function fetchNews(){
   const provider = document.getElementById('newsProvider').value;
   const key = document.getElementById('newsKey').value.trim();
   if(provider !== 'rss' && !key){ toast(`Enter your ${PROVIDER_NAMES[provider]} key`, 'err'); return; }
@@ -1746,14 +1746,7 @@ async function fetchNews(silent = false){
   const lang = document.getElementById('lang').value;
   const sort = document.getElementById('sortBy').value;
 
-  if(!silent) {
-    document.getElementById('feedEl').innerHTML='<div class="spinner"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>';
-  }
-  // Show subtle indicator in feed bar title during silent refresh
-  if(silent) {
-    const bt = document.querySelector('.feed-bar-title');
-    if(bt) bt.innerHTML = bt.textContent + ' <span style="font-size:8px;color:var(--muted2);animation:blink 1s infinite;">●</span>';
-  }
+  document.getElementById('feedEl').innerHTML='<div class="spinner"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>';
   log(`[${PROVIDER_NAMES[provider]}] Fetching: "${q.slice(0,40)}"…`, 'inf');
 
   try {
@@ -1848,35 +1841,26 @@ async function fetchNews(silent = false){
           const newIdx = articles.findIndex(a => a.url === prevSelUrl);
           if(newIdx >= 0) selIdx = newIdx;
         }
-        document.getElementById('sFetched').textContent = articles.length;
-        log(`⚡ ${newArts.length} new article(s) — prepending to feed`, 'ok');
-
-        if(silent) {
-          // Silent: prepend only new cards to top of feed without full re-render
-          prependNewCards(newArts, newArts.length);
-        } else {
-          renderFeed();
-        }
-        // Flash feed bar title
+        log(`⚡ ${newArts.length} new article(s) — feed updated`, 'ok');
+        // Flash feed title green
         const feedTitle = document.querySelector('.feed-bar-title');
-        if(feedTitle){ feedTitle.style.color='var(--green)'; setTimeout(()=>feedTitle.style.color='',2000); }
+        if(feedTitle){ feedTitle.style.color='var(--green)'; setTimeout(()=>feedTitle.style.color='',1500); }
       } else {
         log(`✓ Feed up to date — ${articles.length} articles`, 'inf');
-        // Restore title if it had the blink indicator
-        const bt = document.querySelector('.feed-bar-title');
-        if(bt) bt.innerHTML = bt.textContent.replace(' ●','');
       }
     } else {
-      // First load — always full render
+      // First load
       articles = freshArticles;
-      document.getElementById('sFetched').textContent = articles.length;
       log(`✓ ${articles.length} articles loaded`, 'ok');
-      renderFeed();
     }
+
+    document.getElementById('sFetched').textContent = articles.length;
 
     if (document.getElementById('tgAiAuto').classList.contains('on')) {
       log('AI caption mode: ON — will generate on select', 'inf');
     }
+
+    renderFeed();
 
     if (autoPostEnabled) {
       const brk = articles.filter(a => isBreaking(a) && !postedUrls.has(a.url));
@@ -1887,86 +1871,15 @@ async function fetchNews(silent = false){
     }
 
   } catch(err) {
-    if(!silent) {
-      document.getElementById('feedEl').innerHTML=`<div class="empty"><div class="empty-icon">⚠</div><div class="empty-ttl">FETCH FAILED</div><div class="empty-sub">${err.message}</div></div>`;
-      toast(err.message, 'err');
-    }
+    document.getElementById('feedEl').innerHTML=`<div class="empty"><div class="empty-icon">⚠</div><div class="empty-ttl">FETCH FAILED</div><div class="empty-sub">${err.message}</div></div>`;
     log('Fetch failed: '+err.message, 'err');
+    toast(err.message, 'err');
   }
 }
 
 // ══════════════════════════════════════════
 // RENDER FEED
 // ══════════════════════════════════════════
-// ── Prepend new cards to top of feed without full re-render ──
-function prependNewCards(newArts, insertCount) {
-  const feedEl = document.getElementById('feedEl');
-  if(!feedEl) return;
-
-  // Shift existing card indices up by insertCount
-  feedEl.querySelectorAll('.ncard').forEach(el => {
-    const id = el.id; // nc-N
-    const n = parseInt(id.replace('nc-',''));
-    if(!isNaN(n)) el.id = `nc-${n + insertCount}`;
-    el.onclick = (() => {
-      const newN = n + insertCount;
-      return () => selectArt(newN);
-    })();
-  });
-
-  // Build HTML for new cards
-  const newHtml = newArts.map((a, i) => makeCard(a, i)).join('');
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = newHtml;
-
-  // Animate new cards sliding in from top
-  Array.from(wrapper.children).forEach((el, i) => {
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(-12px)';
-    el.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-    el.style.animationDelay = `${i * 0.05}s`;
-    feedEl.insertBefore(el, feedEl.firstChild);
-    setTimeout(() => {
-      el.style.opacity = '1';
-      el.style.transform = 'translateY(0)';
-    }, 50 + i * 60);
-  });
-
-  // Show "NEW" toast
-  toast(`⚡ ${insertCount} new article${insertCount>1?'s':''} added`, 'ok');
-
-  // Restore feed bar title
-  const bt = document.querySelector('.feed-bar-title');
-  if(bt) bt.innerHTML = bt.textContent.replace(/\s*●.*$/,'');
-}
-
-// ── Build a single card HTML (extracted from renderFeed) ──
-function makeCard(a, i) {
-  const brk = isBreaking(a);
-  const top = a._top || isTop(a);
-  const posted = postedUrls.has(a.url);
-  return `<div class="ncard ${brk?'breaking-card':''} ${selIdx===i?'sel':''}" id="nc-${i}" onclick="selectArt(${i})" style="animation-delay:${(i*0.04).toFixed(2)}s">
-      <div class="card-top">
-        ${a.urlToImage?`<img class="card-thumb" src="${a.urlToImage}" onerror="this.outerHTML='<div class=card-thumb-ph>📰</div>'" loading="lazy">`:`<div class="card-thumb-ph">📰</div>`}
-        <div class="card-top-right">
-          <div class="card-badges">
-            ${brk?'<span class="badge brk">⚡ BREAKING</span>':''}
-            ${top?'<span class="badge top">🔥 TOP</span>':''}
-            ${a.video_url||a._hasVideo?'<span class="badge vid" style="background:rgba(220,38,38,0.15);color:var(--red);border-color:var(--red);">🎬 VIDEO</span>':a.urlToImage?'<span class="badge vid">📷 IMG</span>':''}
-            ${a._esana?'<span class="badge" style="background:rgba(255,140,0,0.15);color:#ff8c00;border-color:rgba(255,140,0,0.4);">හෙළකුරු</span>':''}
-            ${posted?'<span class="badge posted-badge">✓ POSTED</span>':''}
-            <span class="badge src">${a.source.name}</span>
-          </div>
-          <div class="card-title">${cleanTitle(a.title)}</div>
-          ${a._esana && a.title_en ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-top:2px;line-height:1.4;">${a.title_en}</div>` : ''}
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="card-desc">${a.description||'No description available.'}</div>
-      </div>
-    </div>`;
-}
-
 function renderFeed(){
   let arts=articles;
   if(currentTab==='breaking') arts=arts.filter(isBreaking);
@@ -3252,7 +3165,7 @@ function toggleRefresh(btn){
   btn.classList.toggle('on');
   if(btn.classList.contains('on')){
     fetchNews();
-    autoRefreshTimer=setInterval(()=>fetchNews(true),5*60*1000);
+    autoRefreshTimer=setInterval(fetchNews,5*60*1000);
     log('Auto-refresh ON (every 5 min)','ok');
   }else{
     clearInterval(autoRefreshTimer);
@@ -3836,7 +3749,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchNews();
     // Start real-time auto-refresh every 2 minutes
     if(!autoRefreshTimer) {
-      autoRefreshTimer = setInterval(() => fetchNews(true), 2 * 60 * 1000);
+      autoRefreshTimer = setInterval(fetchNews, 2 * 60 * 1000);
       log('⏱ Real-time feed active — refreshing every 2 min', 'ok');
     }
   }, 300);
