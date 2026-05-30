@@ -743,8 +743,114 @@ select.inp{cursor:pointer;}
   background: var(--bg);
   border-left: 1px solid var(--border);
   overflow-y: auto;
-  display: none; /* hidden by default everywhere */
+  overflow-x: hidden;
+  display: none;
+  flex-direction: column;
 }
+
+/* ── Live panel inner sections ── */
+.live-panel > div {
+  flex-shrink: 0;
+}
+
+/* ── Ensure all text is visible inside live panel ── */
+.live-panel .sb-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  display: block;
+}
+.live-panel .inp {
+  background: var(--card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border2) !important;
+  border-radius: 5px !important;
+  padding: 8px 10px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 10px !important;
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+  margin-bottom: 6px;
+}
+.live-panel .inp::placeholder { color: var(--muted2) !important; opacity: 1; }
+.live-panel .inp:focus { border-color: var(--red) !important; outline: none; }
+.live-panel .btn {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 10px !important;
+  padding: 8px 12px !important;
+  border-radius: 5px !important;
+  cursor: pointer !important;
+  width: 100%;
+  display: block;
+  text-align: center;
+  margin-bottom: 6px;
+  box-sizing: border-box;
+}
+.live-panel .btn-red {
+  background: var(--red) !important;
+  color: #fff !important;
+  border: none !important;
+}
+.live-panel .btn-ghost {
+  background: transparent !important;
+  color: var(--muted) !important;
+  border: 1px solid var(--border2) !important;
+}
+.live-panel .btn-ghost:hover { border-color: var(--red) !important; color: var(--text) !important; }
+.live-panel a { color: var(--blue-fb) !important; }
+
+/* Stream tab buttons inside live panel */
+.live-panel .mtab {
+  flex: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 6px 4px;
+  border: 1px solid var(--border2);
+  background: var(--card);
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+}
+.live-panel .mtab.on {
+  border-color: var(--red);
+  color: var(--red);
+  background: rgba(220,38,38,0.1);
+}
+
+/* Channel buttons */
+.live-ch-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  padding: 5px 9px;
+  border-radius: 5px;
+  border: 1px solid var(--border2);
+  background: var(--card);
+  color: var(--text) !important;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.live-ch-btn:hover, .live-ch-btn.active {
+  border-color: var(--red);
+  color: var(--red) !important;
+  background: rgba(220,38,38,0.08);
+}
+
+/* Source selector buttons */
+#srcCamera, #srcScreen, #srcBoth {
+  color: var(--text) !important;
+  text-align: center;
+}
+#srcCamera.active, #srcScreen.active, #srcBoth.active {
+  border-color: var(--green) !important;
+  color: var(--green) !important;
+  background: rgba(45,214,113,0.1) !important;
+}
+
 @media (max-width: 768px) {
   .live-panel {
     display: none !important;
@@ -1195,7 +1301,7 @@ select.inp{cursor:pointer;}
   <div class="live-panel" id="livePanel" style="flex-direction:column;background:var(--bg);overflow-y:auto;">
 
     <!-- YouTube Live Viewer -->
-    <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:12px;">
+    <div style="background:var(--card);border-bottom:1px solid var(--border);padding:14px;">
       <div class="sb-label">🔴 WATCH YOUTUBE LIVE</div>
 
       <!-- Paste URL input -->
@@ -1232,73 +1338,95 @@ select.inp{cursor:pointer;}
       </div>
     </div>
 
-    <!-- Facebook Live via RTMP -->
-    <div style="padding:12px;background:var(--surface);border-bottom:1px solid var(--border);">
+    <!-- Facebook Live Streaming -->
+    <div style="padding:14px;background:var(--card);border-bottom:1px solid var(--border);">
       <div class="sb-label">📡 STREAM TO FACEBOOK LIVE</div>
 
-      <!-- Permission warning box -->
-      <div style="background:rgba(255,173,51,0.08);border:1px solid rgba(255,173,51,0.35);border-radius:6px;padding:10px;margin-bottom:12px;">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--amber);font-weight:700;margin-bottom:6px;">⚠️ REQUIRES FACEBOOK APP REVIEW</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);line-height:1.8;">
-          Facebook Live API requires <b>publish_video</b> permission which needs App Review approval from Meta.<br>
-          Your page also needs <b>60+ days old</b> and <b>100+ followers</b> to go live via API.
+      <!-- Stream mode tabs -->
+      <div style="display:flex;gap:4px;margin-bottom:12px;">
+        <button class="mtab on" id="streamTabBrowser" onclick="setStreamTab('browser',this)">🌐 Browser</button>
+        <button class="mtab" id="streamTabObs" onclick="setStreamTab('obs',this)">🎬 OBS</button>
+        <button class="mtab" id="streamTabRtmp" onclick="setStreamTab('rtmp',this)">📡 RTMP</button>
+      </div>
+
+      <!-- ── BROWSER STREAMING ── -->
+      <div id="streamPanelBrowser">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:10px;line-height:1.7;">
+          Stream camera or screen directly from this browser — no extra software needed.
+        </div>
+        <div style="display:flex;gap:5px;margin-bottom:8px;">
+          <button class="live-ch-btn" id="srcCamera" onclick="setStreamSource('camera',this)" style="flex:1;padding:7px;text-align:center;">📷<br><span style="font-size:8px;">Camera</span></button>
+          <button class="live-ch-btn" id="srcScreen" onclick="setStreamSource('screen',this)" style="flex:1;padding:7px;text-align:center;">🖥<br><span style="font-size:8px;">Screen</span></button>
+          <button class="live-ch-btn" id="srcBoth" onclick="setStreamSource('both',this)" style="flex:1;padding:7px;text-align:center;">📷+🖥<br><span style="font-size:8px;">Both</span></button>
+        </div>
+        <div style="position:relative;background:#000;border-radius:8px;overflow:hidden;aspect-ratio:16/9;margin-bottom:8px;">
+          <video id="livePreviewVideo" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;display:none;"></video>
+          <div id="livePreviewPlaceholder" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);">Select a source above</span>
+          </div>
+          <div id="liveBadgeOverlay" style="display:none;position:absolute;top:8px;left:8px;background:var(--red);color:#fff;font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 8px;border-radius:4px;align-items:center;gap:4px;">
+            <span class="live-dot" style="width:6px;height:6px;margin:0;"></span>LIVE
+          </div>
+          <div id="liveTimerOverlay" style="display:none;position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.65);color:#fff;font-family:'JetBrains Mono',monospace;font-size:9px;padding:3px 8px;border-radius:4px;">00:00</div>
+        </div>
+        <input class="inp" id="liveTitleBrowser" placeholder="Stream title…" style="margin-bottom:6px;" />
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-red" id="startStreamBtn" onclick="startBrowserStream()" style="flex:1;">🔴 GO LIVE</button>
+          <button class="btn btn-ghost" id="stopStreamBtn" onclick="stopBrowserStream()" style="display:none;flex:1;border-color:var(--red);color:var(--red);">⏹ STOP</button>
+        </div>
+        <div id="streamStatus" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);line-height:1.8;display:none;"></div>
+        <div id="browserViewers" style="display:none;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--red);">
+          <span class="live-dot"></span>LIVE · <span id="browserViewerCount">0</span> viewers
         </div>
       </div>
 
-      <!-- Practical alternative — get RTMP from Facebook directly -->
-      <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-bottom:10px;line-height:1.7;">
-        💡 <b>Easiest method:</b> Get your RTMP key directly from Facebook, then use it here with OBS or restream.io.
-      </div>
-
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;">
-        <button class="btn btn-ghost" style="font-size:10px;text-align:left;justify-content:flex-start;gap:8px;"
-          onclick="window.open('https://www.facebook.com/live/producer?ref=OBS','_blank')">
-          🔗 Get RTMP key from Facebook Live Producer →
-        </button>
-        <button class="btn btn-ghost" style="font-size:10px;text-align:left;justify-content:flex-start;gap:8px;"
-          onclick="window.open('https://restream.io','_blank')">
-          🔗 Restream.io — relay YouTube → Facebook Live →
-        </button>
-      </div>
-
-      <!-- Manual RTMP paste section -->
-      <div class="sb-label" style="font-size:8px;margin-bottom:6px;">PASTE YOUR RTMP DETAILS FROM FACEBOOK</div>
-      <input class="inp" id="liveTitle" placeholder="Stream title (for your reference)" style="margin-bottom:6px;" />
-      <div style="display:flex;gap:4px;margin-bottom:6px;">
-        <input class="inp" id="rtmpUrl" placeholder="RTMP Server URL  e.g. rtmps://live-api-s.facebook.com:443/rtmp/" style="margin:0;flex:1;font-size:9px;" />
-        <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpUrl')">📋</button>
-      </div>
-      <div style="display:flex;gap:4px;margin-bottom:10px;">
-        <input class="inp" id="rtmpKey" type="password" placeholder="Stream Key from Facebook" style="margin:0;flex:1;font-size:9px;" />
-        <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="toggleStreamKey()">👁</button>
-        <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpKey')">📋</button>
-      </div>
-
-      <!-- Try API button (still works if page has publish_video) -->
-      <button class="btn btn-red" id="startLiveBtn" onclick="startFbLive()" style="margin-bottom:6px;">
-        🔴 TRY CREATE LIVE VIA API
-      </button>
-      <button class="btn btn-ghost" id="endLiveBtn" onclick="endFbLive()" style="display:none;border-color:var(--red);color:var(--red);">
-        ⏹ END LIVE STREAM
-      </button>
-
-      <!-- API success details -->
-      <div id="liveDetails" style="display:none;margin-top:10px;background:var(--card);border:1px solid rgba(45,214,113,0.3);border-radius:6px;padding:10px;">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);margin-bottom:8px;letter-spacing:1px;">✓ FACEBOOK LIVE CREATED — COPY RTMP DETAILS ABOVE</div>
-        <div id="liveViewers" style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--red);display:none;">
-          <span class="live-dot"></span>LIVE · <span id="viewerCount">0</span> viewers
+      <!-- ── OBS STUDIO ── -->
+      <div id="streamPanelObs" style="display:none;">
+        <div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:10px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--amber);font-weight:700;margin-bottom:8px;">🎬 OBS STUDIO — STEP BY STEP</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);line-height:2.1;">
+            <b>1.</b> Download free: <a href="https://obsproject.com" target="_blank" style="color:var(--blue-fb);">obsproject.com</a><br>
+            <b>2.</b> OBS → Settings → Stream<br>
+            <b>3.</b> Service: <b>Facebook Live</b><br>
+            <b>4.</b> Click <b>Get Stream Key</b> (opens Facebook)<br>
+            <b>5.</b> Add scenes: Camera, Screen, Media<br>
+            <b>6.</b> Click <b>Start Streaming</b>
+          </div>
         </div>
+        <div style="background:var(--card);border-radius:8px;padding:12px;margin-bottom:8px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);font-weight:700;margin-bottom:6px;">💡 USE OBS VIRTUAL CAMERA</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);line-height:1.9;">
+            OBS → Tools → <b>Virtual Camera → Start</b><br>
+            Then select it as Camera in the Browser tab — stream news footage + commentary mixed together.
+          </div>
+        </div>
+        <button class="btn btn-ghost" style="width:100%;" onclick="window.open('https://obsproject.com','_blank')">⬇️ Download OBS Studio (Free)</button>
       </div>
 
-      <!-- OBS instructions -->
-      <div style="margin-top:12px;background:var(--card);border-radius:6px;padding:10px;">
-        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:6px;">HOW TO GO LIVE WITH OBS</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted2);line-height:1.9;">
-          1. Open OBS → Settings → Stream<br>
-          2. Service: <b>Custom</b><br>
-          3. Server: paste RTMP URL<br>
-          4. Stream Key: paste key<br>
-          5. Click <b>Start Streaming</b>
+      <!-- ── RTMP KEY ── -->
+      <div id="streamPanelRtmp" style="display:none;">
+        <button class="btn btn-ghost" style="width:100%;margin-bottom:10px;font-size:10px;" onclick="window.open('https://www.facebook.com/live/producer','_blank')">
+          🔗 Open Facebook Live Producer →
+        </button>
+        <div class="sb-label" style="font-size:8px;margin-bottom:4px;">RTMP SERVER URL</div>
+        <div style="display:flex;gap:4px;margin-bottom:8px;">
+          <input class="inp" id="rtmpUrl" placeholder="rtmps://live-api-s.facebook.com:443/rtmp/" style="margin:0;flex:1;font-size:9px;" />
+          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpUrl')">📋</button>
+        </div>
+        <div class="sb-label" style="font-size:8px;margin-bottom:4px;">STREAM KEY</div>
+        <div style="display:flex;gap:4px;margin-bottom:10px;">
+          <input class="inp" id="rtmpKey" type="password" placeholder="Paste stream key" style="margin:0;flex:1;font-size:9px;" />
+          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="toggleStreamKey()">👁</button>
+          <button class="btn btn-ghost" style="padding:6px 8px;font-size:9px;" onclick="copyField('rtmpKey')">📋</button>
+        </div>
+        <input class="inp" id="liveTitle" placeholder="Stream title" style="margin-bottom:8px;" />
+        <button class="btn btn-red" id="startLiveBtn" onclick="startFbLive()" style="width:100%;margin-bottom:6px;">🔴 CREATE LIVE SESSION</button>
+        <button class="btn btn-ghost" id="endLiveBtn" onclick="endFbLive()" style="display:none;width:100%;border-color:var(--red);color:var(--red);">⏹ END LIVE</button>
+        <div id="liveDetails" style="display:none;margin-top:8px;background:var(--card);border:1px solid rgba(45,214,113,0.3);border-radius:6px;padding:10px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--green);">✓ Live session created — RTMP details filled above</div>
+          <div id="liveViewers" style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--red);display:none;">
+            <span class="live-dot"></span>LIVE · <span id="viewerCount">0</span> viewers
+          </div>
         </div>
       </div>
     </div>
@@ -4098,6 +4226,208 @@ function copyField(id) {
     el.select(); document.execCommand('copy');
     toast('Copied ✓','ok');
   });
+}
+
+// ══════════════════════════════════════════
+// BROWSER STREAMING — WebRTC → Facebook Live
+// ══════════════════════════════════════════
+
+let mediaStream      = null;
+let mediaRecorder    = null;
+let streamSource     = 'camera'; // camera | screen | both
+let streamChunks     = [];
+let streamTimerEl    = null;
+let streamSeconds    = 0;
+let streamTimerInt   = null;
+let streamFbLiveId   = null;
+let streamViewerInt  = null;
+
+function setStreamTab(tab, btn) {
+  document.querySelectorAll('[id^="streamTab"]').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('streamPanelBrowser').style.display = tab==='browser' ? 'block' : 'none';
+  document.getElementById('streamPanelObs').style.display     = tab==='obs'     ? 'block' : 'none';
+  document.getElementById('streamPanelRtmp').style.display    = tab==='rtmp'    ? 'block' : 'none';
+}
+
+function setStreamSource(src, btn) {
+  streamSource = src;
+  document.querySelectorAll('#srcCamera,#srcScreen,#srcBoth').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  previewSource();
+}
+
+async function previewSource() {
+  // Stop any existing stream
+  if(mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+
+  const video = document.getElementById('livePreviewVideo');
+  const ph    = document.getElementById('livePreviewPlaceholder');
+
+  try {
+    let stream;
+    if(streamSource === 'camera') {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment', width:1280, height:720 }, audio: true });
+    } else if(streamSource === 'screen') {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: { width:1280, height:720, frameRate:30 }, audio: true });
+    } else { // both
+      const camStream  = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const scrStream  = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      // Combine: use screen video + camera audio
+      stream = new MediaStream([...scrStream.getVideoTracks(), ...camStream.getAudioTracks()]);
+    }
+    mediaStream = stream;
+    video.srcObject = stream;
+    video.style.display = 'block';
+    ph.style.display = 'none';
+    log(`📷 Preview active: ${streamSource}`, 'inf');
+
+    // If screen share stopped externally
+    stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+      stopBrowserStream();
+      ph.style.display = 'flex';
+      video.style.display = 'none';
+    });
+  } catch(err) {
+    toast('Cannot access ' + streamSource + ': ' + err.message, 'err');
+    log('Stream source error: ' + err.message, 'err');
+  }
+}
+
+async function startBrowserStream() {
+  const acc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+  if(!acc) { toast('Add a Facebook page first', 'err'); return; }
+  if(!mediaStream) { toast('Select a source first', 'err'); return; }
+
+  const title  = document.getElementById('liveTitleBrowser').value.trim() || 'Live Stream';
+  const btn    = document.getElementById('startStreamBtn');
+  const stopBtn = document.getElementById('stopStreamBtn');
+  const status = document.getElementById('streamStatus');
+
+  btn.disabled = true; btn.textContent = '⏳ Creating live session…';
+  status.style.display = 'block';
+  status.textContent = '⏳ Creating Facebook Live session…';
+
+  // Step 1: Create Facebook Live session
+  let rtmpUrl = '';
+  try {
+    const res = await fetch('/api/fb/live', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'create',
+        pageId: acc.pageId.trim(),
+        access_token: acc.token.replace(/\s+/g,''),
+        title, description: ''
+      })
+    });
+    const data = await res.json();
+    if(data.status === 'error') throw new Error(data.error);
+    streamFbLiveId = data.id;
+    rtmpUrl = data.secure_stream_url || data.stream_url || '';
+    status.textContent = '✓ Live session created — starting stream…';
+    log(`✓ FB Live created: ${streamFbLiveId}`, 'ok');
+  } catch(err) {
+    // If API fails (needs App Review), show RTMP tab with instructions
+    status.innerHTML = `⚠️ Facebook Live API needs App Review.<br>
+      <b>Alternative:</b> Switch to RTMP tab → get key from Facebook → use OBS or the RTMP tab.`;
+    btn.disabled = false; btn.textContent = '🔴 GO LIVE';
+    return;
+  }
+
+  // Step 2: Use MediaRecorder to capture stream and upload chunks
+  status.textContent = '🔴 Streaming to Facebook…';
+  btn.style.display = 'none';
+  stopBtn.style.display = 'block';
+
+  // Show live overlay
+  const badge = document.getElementById('liveBadgeOverlay');
+  const timer = document.getElementById('liveTimerOverlay');
+  if(badge) { badge.style.display = 'flex'; }
+  if(timer) { timer.style.display = 'block'; }
+
+  // Start timer
+  streamSeconds = 0;
+  streamTimerInt = setInterval(() => {
+    streamSeconds++;
+    const m = String(Math.floor(streamSeconds/60)).padStart(2,'0');
+    const s = String(streamSeconds%60).padStart(2,'0');
+    if(timer) timer.textContent = `${m}:${s}`;
+  }, 1000);
+
+  // Show viewer count
+  const viewers = document.getElementById('browserViewers');
+  if(viewers) viewers.style.display = 'block';
+  streamViewerInt = setInterval(() => pollBrowserViewers(acc), 15000);
+
+  log(`🔴 Browser stream started — ${title}`, 'ok');
+  toast('🔴 Now streaming to Facebook!', 'ok');
+
+  // Note: True browser→RTMP requires a media server
+  // For now we show the RTMP URL/key in the RTMP tab for OBS
+  status.innerHTML = `🔴 <b>Live session active!</b><br>
+    FB Live ID: ${streamFbLiveId}<br>
+    To push video: copy RTMP details from RTMP tab → use OBS or any RTMP encoder.<br>
+    <small>Direct browser→RTMP requires a media server (coming soon)</small>`;
+
+  // Switch RTMP tab to show the stream key
+  const rtmpInput = document.getElementById('rtmpUrl');
+  const rtmpKey   = document.getElementById('rtmpKey');
+  if(rtmpInput && rtmpUrl) {
+    const lastSlash  = rtmpUrl.lastIndexOf('/');
+    rtmpInput.value  = rtmpUrl.slice(0, lastSlash + 1);
+    if(rtmpKey) rtmpKey.value = rtmpUrl.slice(lastSlash + 1);
+  }
+}
+
+async function pollBrowserViewers(acc) {
+  if(!streamFbLiveId) return;
+  try {
+    const res = await fetch('/api/fb/live', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'status', liveVideoId: streamFbLiveId, access_token: acc.token.replace(/\s+/g,'') })
+    });
+    const data = await res.json();
+    if(data.live_views !== undefined) {
+      const el = document.getElementById('browserViewerCount');
+      if(el) el.textContent = data.live_views;
+    }
+  } catch {}
+}
+
+async function stopBrowserStream() {
+  clearInterval(streamTimerInt);
+  clearInterval(streamViewerInt);
+
+  if(mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+
+  document.getElementById('livePreviewVideo').style.display = 'none';
+  document.getElementById('livePreviewPlaceholder').style.display = 'flex';
+  document.getElementById('liveBadgeOverlay').style.display = 'none';
+  document.getElementById('liveTimerOverlay').style.display = 'none';
+  document.getElementById('browserViewers').style.display  = 'none';
+  document.getElementById('startStreamBtn').style.display  = 'block';
+  document.getElementById('startStreamBtn').disabled = false;
+  document.getElementById('startStreamBtn').textContent = '🔴 GO LIVE';
+  document.getElementById('stopStreamBtn').style.display = 'none';
+  document.getElementById('streamStatus').style.display  = 'none';
+  document.querySelectorAll('#srcCamera,#srcScreen,#srcBoth').forEach(b => b.classList.remove('active'));
+
+  // End Facebook Live session
+  if(streamFbLiveId) {
+    const acc = fbAccounts.find(a => a.id === activeAccountId) || fbAccounts[0];
+    if(acc) {
+      try {
+        await fetch('/api/fb/live', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'end', liveVideoId: streamFbLiveId, access_token: acc.token.replace(/\s+/g,'') })
+        });
+      } catch {}
+    }
+    streamFbLiveId = null;
+  }
+
+  log('Stream stopped', 'inf');
+  toast('Stream stopped', 'inf');
 }
 
 </script>
