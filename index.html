@@ -914,7 +914,8 @@ select.inp{cursor:pointer;}
     <div class="sb-section">
       <div class="sb-label">News Source</div>
       <select class="inp" id="newsProvider" onchange="onProviderChange()">
-        <option value="rss">⚡ RSS Feeds — TRUE Real-time (no key needed)</option>
+        <option value="rss">⚡ RSS Feeds — Real-time (no key)</option>
+        <option value="ytfeeds">🎬 YouTube Video Feeds (no key)</option>
         <option value="gnews">🔑 GNews.io — Real-time</option>
         <option value="newsdata">🔑 NewsData.io — Real-time + Video</option>
         <option value="guardian">🔑 The Guardian — Free</option>
@@ -1063,6 +1064,7 @@ select.inp{cursor:pointer;}
         <button class="ftab" onclick="setTab('breaking',this)">🚨 BREAKING</button>
         <button class="ftab" onclick="setTab('top',this)">🔥 TOP</button>
         <button class="ftab" onclick="setTab('video',this)">🎬 VIDEO</button>
+        <button class="ftab" onclick="setTab('ytonly',this)">▶ YOUTUBE</button>
         <button class="ftab" onclick="setTab('lk',this)">🇱🇰 SRI LANKA</button>
         <button class="ftab" onclick="setTab('lk_si',this)">🇱🇰 සිංහල</button>
         <button class="ftab" onclick="setTab('unposted',this)">⏳ UNPOSTED</button>
@@ -1843,13 +1845,14 @@ document.querySelectorAll('.chip').forEach(c=>{
 // ══════════════════════════════════════════
 const PROVIDER_HINTS = {
   rss:      '✅ Zero delay · No key needed · 15 major sources · Updates every minute',
+  ytfeeds:  '🎬 YouTube RSS · No key needed · 16 channels · Al Jazeera, DW, CNN, AP, Ada Derana + more · All articles have video',
   gnews:    '🔑 Real-time · Free: 100 req/day · gnews.io',
   newsdata: '🔑 Real-time · Free: 200 req/day · newsdata.io',
   guardian: '🔑 Real-time · Free: 500 req/day · open-platform.theguardian.com',
   newsapi:  '⚠ 24hr DELAY on free plan · newsapi.org',
 };
 const PROVIDER_NAMES = {
-  rss:'RSS Feeds', gnews:'GNews.io', newsdata:'NewsData.io', guardian:'The Guardian', newsapi:'NewsAPI.org'
+  rss:'RSS Feeds', ytfeeds:'YouTube Feeds', gnews:'GNews.io', newsdata:'NewsData.io', guardian:'The Guardian', newsapi:'NewsAPI.org'
 };
 
 function onProviderChange() {
@@ -1886,6 +1889,23 @@ async function fetchNews(silent = false){
 
   try {
     let rawArticles = [];
+
+    // ── YouTube Video Feeds ──
+    if(provider === 'ytfeeds') {
+      const isSiTab = currentTab === 'lk_si';
+      const res = await fetch('/api/news/yt-feeds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: isSiTab ? '' : q, lkOnly: isSiTab })
+      });
+      const data = await res.json();
+      if(data.status !== 'ok') throw new Error(data.message || 'YouTube feeds error');
+      rawArticles = data.articles || [];
+      // Auto-switch to VIDEO tab when YouTube feeds selected
+      if(currentTab === 'all' || currentTab === 'video') {
+        // keep current tab
+      }
+    }
 
     // ── RSS: no API key, zero delay ──
     if(provider === 'rss') {
@@ -2075,8 +2095,10 @@ function prependNewCards(newArts, insertCount) {
       <div class="card-foot">
         <span class="card-time">${timeAgo(a.publishedAt)}</span>
         <div class="card-btns">
-          <button class="cbtn ai-gen" onclick="event.stopPropagation();quickAiPost(${i})">✨ AI+Post</button>
-          <button class="cbtn post-now" onclick="event.stopPropagation();quickPost(${i})">📘 Post</button>
+          <button class="cbtn ai-gen" onclick="event.stopPropagation();quickAiPost(${i})">✨ AI</button>
+          ${a._ytVideo
+            ? `<button class="cbtn post-now" style="background:rgba(220,38,38,0.15);border-color:var(--red);color:var(--red);" onclick="event.stopPropagation();quickPostYt(${i})">🎬 Post</button>`
+            : `<button class="cbtn post-now" onclick="event.stopPropagation();quickPost(${i})">📘 Post</button>`}
           <button class="cbtn" onclick="event.stopPropagation();window.open('${a.url}','_blank')">🔗</button>
         </div>
       </div>
@@ -2112,6 +2134,7 @@ function renderFeed(){
   if(currentTab==='breaking') arts=arts.filter(isBreaking);
   else if(currentTab==='top') arts=arts.filter(a=>a._top||isTop(a));
   else if(currentTab==='video') arts=arts.filter(hasVideo);
+  else if(currentTab==='ytonly') arts=arts.filter(a=>a._ytVideo);
   else if(currentTab==='unposted') arts=arts.filter(a=>!postedUrls.has(a.url));
   else if(currentTab==='lk') arts=arts.filter(a=>LK_SOURCES_EN.has(a.source?.name));
   else if(currentTab==='lk_si') arts=arts.filter(a=>LK_SOURCES_SI.has(a.source?.name));
@@ -2142,6 +2165,7 @@ function renderFeed(){
           </div>
           <div class="card-title">${cleanTitle(a.title)}</div>
           ${a._esana && a.title_en ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-top:2px;line-height:1.4;">${a.title_en}</div>` : ''}
+          ${a._ytVideo ? `<div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--red);margin-top:3px;">▶ ${a.source.name} · YouTube</div>` : ''}
         </div>
       </div>
       <div class="card-body">
@@ -2150,8 +2174,10 @@ function renderFeed(){
       <div class="card-foot">
         <span class="card-time">${timeAgo(a.publishedAt)}</span>
         <div class="card-btns">
-          <button class="cbtn ai-gen" onclick="event.stopPropagation();quickAiPost(${i})">✨ AI+Post</button>
-          <button class="cbtn post-now" onclick="event.stopPropagation();quickPost(${i})">📘 Post</button>
+          <button class="cbtn ai-gen" onclick="event.stopPropagation();quickAiPost(${i})">✨ AI</button>
+          ${a._ytVideo
+            ? `<button class="cbtn post-now" style="background:rgba(220,38,38,0.15);border-color:var(--red);color:var(--red);" onclick="event.stopPropagation();quickPostYt(${i})">🎬 Post</button>`
+            : `<button class="cbtn post-now" onclick="event.stopPropagation();quickPost(${i})">📘 Post</button>`}
           <button class="cbtn" onclick="event.stopPropagation();window.open('${a.url}','_blank')">🔗</button>
         </div>
       </div>
@@ -2163,13 +2189,23 @@ function setTab(tab,btn){
   currentTab=tab;
   // Update feed title
   const titles = {all:'GLOBAL FEED',breaking:'🚨 BREAKING NEWS',top:'🔥 TOP STORIES',
-    video:'🎬 VIDEO FEED',
+    video:'🎬 VIDEO FEED',ytonly:'▶ YOUTUBE VIDEO FEED',
     lk:'🇱🇰 SRI LANKA NEWS (English)',lk_si:'🇱🇰 ශ්‍රී ලංකා පුවත් (සිංහල)',
     unposted:'⏳ UNPOSTED'};
   const titleEl = document.querySelector('.feed-bar-title');
   if(titleEl) titleEl.textContent = titles[tab] || 'FEED';
-  // Auto-fetch when switching to Sinhala tab so it loads with no keyword
+  // Auto-fetch when switching to Sinhala tab or YouTube tab
   if(tab === 'lk_si') fetchNews();
+  if(tab === 'ytonly') {
+    // Switch to YouTube feeds provider and fetch
+    const provSel = document.getElementById('newsProvider');
+    if(provSel) { provSel.value = 'ytfeeds'; onProviderChange(); }
+    fetchNews();
+  }
+  if(tab === 'video') {
+    // Combined video feed: RSS videos + YouTube
+    fetchVideoFeed();
+  }
   document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
   if(articles.length) renderFeed();
@@ -2245,7 +2281,18 @@ function selectArt(i){
   }
   document.getElementById('mediaUrl').value = a.url||'';
   document.getElementById('videoUrl').value = a.video_url || '';
-  if(a.video_url) showVideoUploadMode(a.video_url);
+  if(a.video_url) {
+    showVideoUploadMode(a.video_url);
+    // For YouTube videos — auto-switch to video post type
+    if(a._ytVideo && !isPosted) {
+      const vBtn = document.getElementById('ptVideo');
+      if(vBtn) setPostType('video', vBtn);
+      // Switch to URL tab in video panel
+      const vtUrl = document.getElementById('vtUrl');
+      if(vtUrl) setVideoTab('url', vtUrl);
+      log(`🎬 YouTube video loaded: ${cleanTitle(a.title).slice(0,40)}…`, 'inf');
+    }
+  }
   document.getElementById('videoTitle').value = '';
   clearVideoFile();
   hideProgress();
@@ -4428,6 +4475,117 @@ async function stopBrowserStream() {
 
   log('Stream stopped', 'inf');
   toast('Stream stopped', 'inf');
+}
+
+// ══════════════════════════════════════════
+// YOUTUBE VIDEO FEED — Quick post
+// ══════════════════════════════════════════
+
+// One-tap YouTube video post from feed card
+async function quickPostYt(idx) {
+  const a = articles[idx];
+  if(!a || !a._ytVideo) return;
+
+  const acc = fbAccounts.find(x => x.id === activeAccountId) || fbAccounts[0];
+  if(!acc){ toast('Add a Facebook page first','err'); return; }
+
+  // Select the article to build caption
+  selectArt(idx);
+
+  // Wait for caption to build
+  await new Promise(r => setTimeout(r, 150));
+
+  const cap = document.getElementById('captionBox').value || buildCaption(a);
+  const fbToken  = acc.token.replace(/\s+/g,'');
+  const fbPageId = acc.pageId.trim();
+
+  log(`🎬 Quick-posting YouTube video: "${a.title.slice(0,40)}…"`, 'inf');
+  showProgress(15, '🎬 Processing YouTube video…');
+
+  // Try direct upload via yt-download, fallback to embedded link
+  try {
+    const res = await fetch('/api/yt/download', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        url: a.video_url,
+        pageId: fbPageId,
+        access_token: fbToken,
+        caption: cap,
+        title: cleanTitle(a.title).slice(0,80)
+      })
+    });
+    const data = await res.json();
+
+    if(data.status === 'ok') {
+      showProgress(100, '✓ YouTube video posted as native FB video!');
+      setTimeout(hideProgress, 3000);
+      markPosted(a, data.id, idx);
+      log(`✓ YouTube video posted natively! "${a.title.slice(0,35)}"`, 'ok');
+      return;
+    }
+
+    // Fallback: post as link (Facebook embeds YouTube natively)
+    log(`Falling back to embedded link (${data.status})…`, 'inf');
+    showProgress(70, 'Posting as embedded YouTube link…');
+
+    const fbRes = await fetch('/api/fb/post', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ pageId:fbPageId, message:cap, link:a.video_url, access_token:fbToken })
+    });
+    const fbData = await fbRes.json();
+    if(fbData.error) throw new Error(fbData.error.message);
+
+    showProgress(100, '✓ Posted as YouTube link (Facebook plays it inline)');
+    setTimeout(hideProgress, 2500);
+    markPosted(a, fbData.id, idx);
+    toast('Posted! Facebook will embed the YouTube video inline', 'ok');
+
+  } catch(err) {
+    hideProgress();
+    log('YouTube post failed: '+err.message, 'err');
+    toast('Failed: '+err.message, 'err');
+  }
+}
+
+// ── VIDEO FEED: merge RSS video + YouTube feeds ──
+async function fetchVideoFeed(silent = false) {
+  const q   = document.getElementById('searchQ').value || 'war';
+  const acc = fbAccounts[0];
+
+  if(!silent) {
+    document.getElementById('feedEl').innerHTML = '<div class="spinner"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>';
+  }
+  log('🎬 Fetching combined video feed (RSS + YouTube)…', 'inf');
+
+  try {
+    const [rssRes, ytRes] = await Promise.all([
+      fetch('/api/news/rss', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ query: q })
+      }).then(r=>r.json()).catch(()=>({articles:[]})),
+      fetch('/api/news/yt-feeds', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ query: q })
+      }).then(r=>r.json()).catch(()=>({articles:[]}))
+    ]);
+
+    const rssVideos = (rssRes.articles||[]).filter(a => a.video_url || a._hasVideo);
+    const ytVideos  = ytRes.articles || [];
+
+    const seen = new Set();
+    const all = [...ytVideos, ...rssVideos].filter(a => {
+      if(seen.has(a.url)) return false; seen.add(a.url); return true;
+    }).sort((a,b) => new Date(b.publishedAt)-new Date(a.publishedAt));
+
+    articles = all;
+    document.getElementById('sFetched').textContent = articles.length;
+    log(`🎬 Video feed: ${ytVideos.length} YouTube + ${rssVideos.length} RSS videos = ${all.length} total`, 'ok');
+    renderFeed();
+
+  } catch(err) {
+    log('Video feed fetch failed: '+err.message, 'err');
+    if(!silent) document.getElementById('feedEl').innerHTML = `<div class="empty"><div class="empty-icon">⚠</div><div class="empty-ttl">FETCH FAILED</div><div class="empty-sub">${err.message}</div></div>`;
+  }
 }
 
 </script>
