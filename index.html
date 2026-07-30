@@ -916,6 +916,7 @@ select.inp{cursor:pointer;}
       <select class="inp" id="newsProvider" onchange="onProviderChange()">
         <option value="rss">⚡ RSS Feeds — Real-time (no key)</option>
         <option value="ytfeeds">🎬 YouTube Video Feeds (no key)</option>
+        <option value="videorss">📹 Video RSS Feeds — Direct MP4 (no key)</option>
         <option value="gnews">🔑 GNews.io — Real-time</option>
         <option value="newsdata">🔑 NewsData.io — Real-time + Video</option>
         <option value="guardian">🔑 The Guardian — Free</option>
@@ -1846,13 +1847,14 @@ document.querySelectorAll('.chip').forEach(c=>{
 const PROVIDER_HINTS = {
   rss:      '✅ Zero delay · No key needed · 15 major sources · Updates every minute',
   ytfeeds:  '🎬 YouTube RSS · No key needed · 16 channels · Al Jazeera, DW, CNN, AP, Ada Derana + more · All articles have video',
+  videorss: '📹 Direct Video RSS · No key · 15 feeds · AP, Al Jazeera, DW, VOA, Defence Blog, Odysee + more · Real MP4/HLS streams',
   gnews:    '🔑 Real-time · Free: 100 req/day · gnews.io',
   newsdata: '🔑 Real-time · Free: 200 req/day · newsdata.io',
   guardian: '🔑 Real-time · Free: 500 req/day · open-platform.theguardian.com',
   newsapi:  '⚠ 24hr DELAY on free plan · newsapi.org',
 };
 const PROVIDER_NAMES = {
-  rss:'RSS Feeds', ytfeeds:'YouTube Feeds', gnews:'GNews.io', newsdata:'NewsData.io', guardian:'The Guardian', newsapi:'NewsAPI.org'
+  rss:'RSS Feeds', ytfeeds:'YouTube Feeds', videorss:'Video RSS Feeds', gnews:'GNews.io', newsdata:'NewsData.io', guardian:'The Guardian', newsapi:'NewsAPI.org'
 };
 
 function onProviderChange() {
@@ -1889,6 +1891,19 @@ async function fetchNews(silent = false){
 
   try {
     let rawArticles = [];
+
+    // ── Video RSS Feeds (direct MP4/HLS) ──
+    if(provider === 'videorss') {
+      const res = await fetch('/api/news/video-rss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q, videoOnly: currentTab === 'video' })
+      });
+      const data = await res.json();
+      if(data.status !== 'ok') throw new Error(data.message || 'Video RSS error');
+      rawArticles = data.articles || [];
+      if(data.withVideo) log(`📹 ${data.withVideo} articles have direct video URLs`, 'ok');
+    }
 
     // ── YouTube Video Feeds ──
     if(provider === 'ytfeeds') {
@@ -2166,6 +2181,7 @@ function renderFeed(){
           <div class="card-title">${cleanTitle(a.title)}</div>
           ${a._esana && a.title_en ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted2);margin-top:2px;line-height:1.4;">${a.title_en}</div>` : ''}
           ${a._ytVideo ? `<div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--red);margin-top:3px;">▶ ${a.source.name} · YouTube</div>` : ''}
+          ${a._videoSource==='rss' && a.video_url ? `<div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--green);margin-top:3px;">📹 Direct MP4 · ${a.source.name}</div>` : ''}
         </div>
       </div>
       <div class="card-body">
@@ -4549,37 +4565,47 @@ async function quickPostYt(idx) {
 
 // ── VIDEO FEED: merge RSS video + YouTube feeds ──
 async function fetchVideoFeed(silent = false) {
-  const q   = document.getElementById('searchQ').value || 'war';
-  const acc = fbAccounts[0];
+  const q = document.getElementById('searchQ').value || 'war';
 
   if(!silent) {
     document.getElementById('feedEl').innerHTML = '<div class="spinner"><div class="sp-dot"></div><div class="sp-dot"></div><div class="sp-dot"></div></div>';
   }
-  log('🎬 Fetching combined video feed (RSS + YouTube)…', 'inf');
+  log('🎬 Fetching combined video feed (Video RSS + YouTube + RSS)…', 'inf');
 
   try {
-    const [rssRes, ytRes] = await Promise.all([
+    // Fetch all 3 sources in parallel
+    const [videoRssRes, ytRes, rssRes] = await Promise.all([
+      fetch('/api/news/video-rss', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ query: q, videoOnly: true })
+      }).then(r=>r.json()).catch(()=>({articles:[],withVideo:0})),
+      fetch('/api/news/yt-feeds', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ query: q })
+      }).then(r=>r.json()).catch(()=>({articles:[]})),
       fetch('/api/news/rss', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ query: q })
       }).then(r=>r.json()).catch(()=>({articles:[]})),
-      fetch('/api/news/yt-feeds', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ query: q })
-      }).then(r=>r.json()).catch(()=>({articles:[]}))
     ]);
 
-    const rssVideos = (rssRes.articles||[]).filter(a => a.video_url || a._hasVideo);
-    const ytVideos  = ytRes.articles || [];
+    const videoRssArts = videoRssRes.articles || [];
+    const ytArts       = ytRes.articles || [];
+    const rssVideos    = (rssRes.articles||[]).filter(a => a.video_url || a._hasVideo);
 
+    // Merge: video RSS first (direct MP4), then YouTube, then RSS with video
     const seen = new Set();
-    const all = [...ytVideos, ...rssVideos].filter(a => {
-      if(seen.has(a.url)) return false; seen.add(a.url); return true;
+    const all = [...videoRssArts, ...rssVideos, ...ytArts].filter(a => {
+      if(!a.url || seen.has(a.url)) return false;
+      seen.add(a.url); return true;
     }).sort((a,b) => new Date(b.publishedAt)-new Date(a.publishedAt));
 
     articles = all;
     document.getElementById('sFetched').textContent = articles.length;
-    log(`🎬 Video feed: ${ytVideos.length} YouTube + ${rssVideos.length} RSS videos = ${all.length} total`, 'ok');
+
+    const directCount = all.filter(a => a.video_url && !a._ytVideo).length;
+    const ytCount     = all.filter(a => a._ytVideo).length;
+    log(`🎬 Video feed: ${directCount} direct MP4 + ${ytCount} YouTube = ${all.length} total`, 'ok');
     renderFeed();
 
   } catch(err) {

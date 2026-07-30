@@ -78,3 +78,8 @@
   from = "/api/news/yt-feeds"
   to = "/.netlify/functions/fetch-yt-feeds"
   status = 200
+
+[[redirects]]
+  from = "/api/news/video-rss"
+  to = "/.netlify/functions/fetch-video-rss"
+  status = 200
