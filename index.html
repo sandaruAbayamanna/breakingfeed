@@ -1857,14 +1857,21 @@ const PROVIDER_NAMES = {
   rss:'RSS Feeds', ytfeeds:'YouTube Feeds', videorss:'Video RSS Feeds', gnews:'GNews.io', newsdata:'NewsData.io', guardian:'The Guardian', newsapi:'NewsAPI.org'
 };
 
+// Providers that need no API key
+const FREE_PROVIDERS = new Set(['rss', 'ytfeeds', 'videorss']);
+
 function onProviderChange() {
   const p = document.getElementById('newsProvider').value;
-  const hint = document.getElementById('apiHint');
+  const hint    = document.getElementById('apiHint');
   const keyWrap = document.getElementById('apiKeyWrap');
+
   hint.textContent = PROVIDER_HINTS[p] || '';
-  hint.style.color = p==='newsapi' ? 'var(--red)' : p==='rss' ? 'var(--green)' : 'var(--amber)';
-  // Hide API key input for RSS — no key needed
-  keyWrap.style.display = p === 'rss' ? 'none' : 'block';
+  hint.style.color = FREE_PROVIDERS.has(p) ? 'var(--green)'
+                   : p === 'newsapi'        ? 'var(--red)'
+                   : 'var(--amber)';
+
+  // Hide API key input for all free providers
+  keyWrap.style.display = FREE_PROVIDERS.has(p) ? 'none' : 'block';
 }
 
 // Run on load
@@ -2215,7 +2222,10 @@ function setTab(tab,btn){
   if(tab === 'ytonly') {
     // Switch to YouTube feeds provider and fetch
     const provSel = document.getElementById('newsProvider');
-    if(provSel) { provSel.value = 'ytfeeds'; onProviderChange(); }
+    if(provSel && provSel.value !== 'ytfeeds') {
+      provSel.value = 'ytfeeds';
+      onProviderChange();
+    }
     fetchNews();
   }
   if(tab === 'video') {
@@ -2268,6 +2278,9 @@ function selectArt(i){
   currentLang = 'en';
   const langEnBtn = document.getElementById('langEn');
   if(langEnBtn) setLang('en', langEnBtn);
+
+  // Switch provider based on card type (YouTube ↔ RSS)
+  switchProviderForCard(a);
 
   // Auto-switch post type — don't pre-fill media if already posted
   const isPosted = postedUrls.has(a.url);
@@ -3032,17 +3045,37 @@ async function postNow(articleIdx, skipTokenCheck=false){
   await postToFB(selIdx);
 }
 
+function switchProviderForCard(a) {
+  const provSel = document.getElementById('newsProvider');
+  if(!provSel) return null;
+  const prev = provSel.value;
+  const target = a._ytVideo ? 'ytfeeds' : (prev === 'ytfeeds' ? 'rss' : prev);
+  if(target !== prev) { provSel.value = target; onProviderChange(); }
+  return prev; // return original so caller can restore
+}
+
+function restoreProvider(prev) {
+  const provSel = document.getElementById('newsProvider');
+  if(!provSel || !prev) return;
+  if(provSel.value !== prev) { provSel.value = prev; onProviderChange(); }
+}
+
 async function quickPost(i){
-  selectArt(i);
-  await new Promise(r=>setTimeout(r,100));
-  await postToFB(i);
+  const a = articles[i];
+  if(!a) return;
+  const prev = switchProviderForCard(a);
+  const cap = buildCaption(a);
+  document.getElementById('captionBox').value = cap;
+  await postToFB(i, cap);
+  // Provider stays on ytfeeds after YT post; restores if non-YT card
 }
 
 async function quickAiPost(i){
-  selectArt(i);
-  await new Promise(r=>setTimeout(r,100));
-  const cap=await aiCaption(i);
-  await postToFB(i,cap);
+  const a = articles[i];
+  if(!a) return;
+  const prev = switchProviderForCard(a);
+  const cap = await aiCaption(i);
+  await postToFB(i, cap);
 }
 
 function copyAndOpen(){
@@ -4505,13 +4538,14 @@ async function quickPostYt(idx) {
   const acc = fbAccounts.find(x => x.id === activeAccountId) || fbAccounts[0];
   if(!acc){ toast('Add a Facebook page first','err'); return; }
 
-  // Select the article to build caption
-  selectArt(idx);
+  // Switch to YouTube feeds provider while posting, restore after
+  const provSel = document.getElementById('newsProvider');
+  const prevProv = provSel?.value;
+  if(provSel && provSel.value !== 'ytfeeds') {
+    provSel.value = 'ytfeeds'; onProviderChange();
+  }
 
-  // Wait for caption to build
-  await new Promise(r => setTimeout(r, 150));
-
-  const cap = document.getElementById('captionBox').value || buildCaption(a);
+  const cap = buildCaption(a);
   const fbToken  = acc.token.replace(/\s+/g,'');
   const fbPageId = acc.pageId.trim();
 
@@ -4560,6 +4594,12 @@ async function quickPostYt(idx) {
     hideProgress();
     log('YouTube post failed: '+err.message, 'err');
     toast('Failed: '+err.message, 'err');
+  } finally {
+    // Restore previous provider
+    if(provSel && prevProv && prevProv !== 'ytfeeds') {
+      provSel.value = prevProv; onProviderChange();
+      log(`Provider restored to: ${prevProv}`, 'inf');
+    }
   }
 }
 
